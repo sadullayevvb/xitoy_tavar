@@ -372,77 +372,97 @@
     );
 
 
-    function sendOrder() {
-
-      const items =
-        Object.entries(cart)
-          .map(([id, quantity]) => {
-
-            const product =
-              products.find(
-                p => p.id == id
-              );
-
-            if (!product) {
-              return null;
-            }
-
-            return {
-              id: product.id,
-              name: product.name,
-              quantity: quantity
-            };
-
-          })
-          .filter(Boolean);
-
-
-      if (items.length === 0) {
-
-        if (tg) {
-          tg.showAlert(
-            "Avval mahsulot miqdorini tanlang."
-          );
-        } else {
-          alert(
-            "Avval mahsulot miqdorini tanlang."
-          );
-        }
-
-        return;
-      }
-
-
-      const order = {
-        items: items
-      };
-
-
-      console.log(
-        "ORDER:",
-        order
+async function sendOrder() {
+  const items = Object.entries(cart)
+    .map(([id, quantity]) => {
+      const product = products.find(
+        p => p.id == id
       );
 
-
-      // Telegram Mini App orqali yuborish
-      if (tg) {
-
-        tg.sendData(
-          JSON.stringify(order)
-        );
-
-      } else {
-
-        alert(
-          JSON.stringify(
-            order,
-            null,
-            2
-          )
-        );
-
+      if (!product) {
+        return null;
       }
+
+      return {
+        id: product.id,
+        quantity: quantity
+      };
+    })
+    .filter(Boolean);
+
+  if (items.length === 0) {
+    if (tg) {
+      tg.showAlert(
+        "Avval mahsulot miqdorini tanlang."
+      );
+    } else {
+      alert(
+        "Avval mahsulot miqdorini tanlang."
+      );
     }
+
+    return;
+  }
+
+  if (!tg || !tg.initData) {
+    alert(
+      "Buyurtma faqat Telegram Mini App orqali beriladi."
+    );
+    return;
+  }
+
+  try {
+    cartButton.disabled = true;
+    cartButton.textContent = "Yuborilmoqda...";
+
+    const response = await fetch("/api/order", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        items: items,
+        initData: tg.initData
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.ok) {
+      throw new Error(
+        result.error ||
+        "Buyurtma yuborilmadi"
+      );
+    }
+
+    cartButton.disabled = false;
+    cartButton.textContent = "Savat — 0 ta";
+
+    // Savatni tozalash
+    Object.keys(cart).forEach(
+      key => delete cart[key]
+    );
+
+    renderProducts();
+
+    tg.showAlert(
+      "✅ Buyurtmangiz qabul qilindi!"
+    );
+
+  } catch (error) {
+    console.error(
+      "ORDER ERROR:",
+      error
+    );
+
+    cartButton.disabled = false;
+    updateCartButton();
+
+    tg.showAlert(
+      "❌ Buyurtmani yuborishda xatolik yuz berdi."
+    );
+  }
+}
 
 
     // =========================
