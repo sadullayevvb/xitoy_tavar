@@ -1,7 +1,9 @@
 import { neon } from "@neondatabase/serverless";
 
-const sql = neon(process.env.DATABASE_URL);
-const BOT_TOKEN = process.env.BOT_TOKEN;
+const DATABASE_URL =
+  process.env.DATABASE_URL || process.env.POSTGRES_URL;
+
+const sql = neon(DATABASE_URL);
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
@@ -21,47 +23,55 @@ export default async function handler(req, res) {
   try {
     const update = req.body;
 
-    // Database jadvalini avtomatik yaratish
+    // Jadvalni avtomatik yaratamiz
     await sql`
       CREATE TABLE IF NOT EXISTS products (
         id SERIAL PRIMARY KEY,
         channel_id TEXT NOT NULL,
         message_id BIGINT NOT NULL,
         name TEXT NOT NULL,
-        photo_file_id TEXT,
+        photo_file_id TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(channel_id, message_id)
       )
     `;
 
-    // Faqat kanal postlarini qabul qilamiz
-    if (!update.channel_post) {
+    // Faqat yangi yoki tahrirlangan kanal postlari
+    const post =
+      update.channel_post ||
+      update.edited_channel_post;
+
+    // Kanal posti bo'lmasa o'tkazib yuboramiz
+    if (!post) {
       return res.status(200).json({
         ok: true,
         ignored: true
       });
     }
 
-    const post = update.channel_post;
+    // FAQAT RASMLI POSTLAR
+    if (!post.photo || post.photo.length === 0) {
+      return res.status(200).json({
+        ok: true,
+        ignored: true,
+        reason: "Rasm yo'q"
+      });
+    }
 
     const channelId = String(post.chat.id);
     const messageId = post.message_id;
 
-    // Mahsulot nomi — postdagi matn/caption
+    // Eng katta rasm variantini olamiz
+    const photoFileId =
+      post.photo[post.photo.length - 1].file_id;
+
+    // Caption
     const name = (
       post.caption ||
-      post.text ||
       "Nomsiz mahsulot"
     ).trim();
 
-    // Rasmning eng katta variantini olamiz
-    let photoFileId = null;
-
-    if (post.photo && post.photo.length > 0) {
-      photoFileId = post.photo[post.photo.length - 1].file_id;
-    }
-
-    // Mahsulotni bazaga saqlash
+    // Bazaga qo'shish yoki yangilash
     await sql`
       INSERT INTO products
         (channel_id, message_id, name, photo_file_id)
@@ -75,14 +85,19 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
+      action: update.edited_channel_post
+        ? "updated"
+        : "created",
       product: {
+        channelId,
+        messageId,
         name,
-        hasPhoto: Boolean(photoFileId)
+        hasPhoto: true
       }
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("TELEGRAM WEBHOOK ERROR:", error);
 
     return res.status(500).json({
       ok: false,
