@@ -1,1 +1,396 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AziKom Zakaz</title>
 
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 12px;
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      color: #222;
+    }
+
+    h2 {
+      margin: 5px 0 15px;
+      font-size: 22px;
+    }
+
+    .search {
+      width: 100%;
+      padding: 13px 15px;
+      border: 0;
+      border-radius: 12px;
+      font-size: 16px;
+      margin-bottom: 15px;
+      outline: none;
+    }
+
+    .products {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .product {
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+
+    .product img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .product-info {
+      padding: 10px;
+    }
+
+    .name {
+      font-size: 15px;
+      font-weight: 600;
+      min-height: 38px;
+    }
+
+    .counter {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      background: #f1f1f1;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .counter button {
+      width: 42px;
+      height: 40px;
+      border: 0;
+      background: #e8e8e8;
+      font-size: 22px;
+      cursor: pointer;
+    }
+
+    .counter span {
+      font-size: 17px;
+      font-weight: bold;
+    }
+
+    .cart {
+      position: sticky;
+      bottom: 10px;
+      margin-top: 18px;
+      width: 100%;
+      padding: 15px;
+      border: 0;
+      border-radius: 14px;
+      background: #222;
+      color: white;
+      font-size: 17px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .cart span {
+      background: white;
+      color: #222;
+      border-radius: 20px;
+      padding: 3px 8px;
+      margin-left: 5px;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 40px 10px;
+      color: #777;
+    }
+
+    .order {
+      display: none;
+      background: white;
+      border-radius: 14px;
+      padding: 15px;
+      margin-top: 15px;
+    }
+
+    .order h3 {
+      margin-top: 0;
+    }
+
+    .order-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .send {
+      width: 100%;
+      padding: 14px;
+      margin-top: 15px;
+      border: 0;
+      border-radius: 12px;
+      background: #229ed9;
+      color: white;
+      font-size: 17px;
+      font-weight: bold;
+    }
+
+    @media (min-width: 600px) {
+      .products {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>🛍 AziKom</h2>
+
+  <input
+    class="search"
+    id="search"
+    type="text"
+    placeholder="🔍 Mahsulot qidirish..."
+  >
+
+  <div class="products" id="products"></div>
+
+  <button class="cart" id="cartButton">
+    🛒 Savat
+    <span id="cartCount">0</span>
+  </button>
+
+  <div class="order" id="order">
+    <h3>📋 Sizning zakazingiz</h3>
+
+    <div id="orderItems"></div>
+
+    <button class="send" id="sendOrder">
+      ✅ Zakazni yuborish
+    </button>
+  </div>
+
+<script>
+
+  // Hozircha TEST mahsulotlar.
+  // Keyin bular o'rniga Telegram kanaldagi mahsulotlar avtomatik keladi.
+
+  const products = [
+    {
+      id: 1,
+      name: "HS-80 korzina",
+      image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=600"
+    },
+    {
+      id: 2,
+      name: "Plastik savat",
+      image: "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?w=600"
+    },
+    {
+      id: 3,
+      name: "Uy uchun korzina",
+      image: "https://images.unsplash.com/photo-1583845112203-454c44d93c6b?w=600"
+    },
+    {
+      id: 4,
+      name: "Saqlash qutisi",
+      image: "https://images.unsplash.com/photo-1558997519-83ea9252edf8?w=600"
+    }
+  ];
+
+  const cart = {};
+
+  const tg = window.Telegram && window.Telegram.WebApp;
+
+  if (tg) {
+    tg.ready();
+    tg.expand();
+  }
+
+  function renderProducts(list = products) {
+
+    const container = document.getElementById("products");
+
+    if (list.length === 0) {
+      container.innerHTML =
+        '<div class="empty">Mahsulot topilmadi</div>';
+      return;
+    }
+
+    container.innerHTML = list.map(product => {
+
+      const count = cart[product.id] || 0;
+
+      return `
+        <div class="product">
+
+          <img
+            src="${product.image}"
+            alt="${product.name}"
+          >
+
+          <div class="product-info">
+
+            <div class="name">
+              ${product.name}
+            </div>
+
+            <div class="counter">
+
+              <button
+                type="button"
+                onclick="changeQuantity(${product.id}, -1)"
+              >
+                −
+              </button>
+
+              <span id="count-${product.id}">
+                ${count}
+              </span>
+
+              <button
+                type="button"
+                onclick="changeQuantity(${product.id}, 1)"
+              >
+                +
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+      `;
+
+    }).join("");
+  }
+
+  function changeQuantity(id, change) {
+
+    cart[id] = (cart[id] || 0) + change;
+
+    if (cart[id] < 0) {
+      cart[id] = 0;
+    }
+
+    const count = document.getElementById("count-" + id);
+
+    if (count) {
+      count.textContent = cart[id];
+    }
+
+    updateCart();
+  }
+
+  function updateCart() {
+
+    let total = 0;
+
+    Object.values(cart).forEach(quantity => {
+      total += quantity;
+    });
+
+    document.getElementById("cartCount").textContent = total;
+  }
+
+  document.getElementById("search").addEventListener("input", function() {
+
+    const text = this.value.toLowerCase().trim();
+
+    const filtered = products.filter(product =>
+      product.name.toLowerCase().includes(text)
+    );
+
+    renderProducts(filtered);
+
+  });
+
+  document.getElementById("cartButton").addEventListener("click", function() {
+
+    const selected = products.filter(product =>
+      (cart[product.id] || 0) > 0
+    );
+
+    const order = document.getElementById("order");
+    const orderItems = document.getElementById("orderItems");
+
+    if (selected.length === 0) {
+
+      orderItems.innerHTML =
+        "<p>Savat bo‘sh.</p>";
+
+      order.style.display = "block";
+      return;
+    }
+
+    orderItems.innerHTML = selected.map(product => `
+      <div class="order-item">
+        <span>${product.name}</span>
+        <b>${cart[product.id]} dona</b>
+      </div>
+    `).join("");
+
+    order.style.display = "block";
+
+    order.scrollIntoView({
+      behavior: "smooth"
+    });
+
+  });
+
+  document.getElementById("sendOrder").addEventListener("click", function() {
+
+    const selected = products.filter(product =>
+      (cart[product.id] || 0) > 0
+    );
+
+    if (selected.length === 0) {
+      alert("Avval mahsulot tanlang.");
+      return;
+    }
+
+    const orderData = selected.map(product => ({
+      id: product.id,
+      name: product.name,
+      quantity: cart[product.id]
+    }));
+
+    /*
+      Keyin shu joyni Telegram botimizga ulaymiz.
+
+      Botga quyidagi ma'lumot yuboriladi:
+      mahsulot nomi + dona soni
+    */
+
+    const data = JSON.stringify(orderData);
+
+    if (tg) {
+      tg.sendData(data);
+    } else {
+      alert("Test rejimi: zakaz tayyor!");
+      console.log(data);
+    }
+
+  });
+
+  renderProducts();
+
+</script>
+
+</body>
+</html>
