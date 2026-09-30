@@ -2,12 +2,13 @@
 <html lang="uz">
 <head>
   <meta charset="UTF-8">
+
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
   >
 
-  <title>AziKom</title>
+  <title>Xitoy tavar zakaz mini ilova</title>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
@@ -16,12 +17,17 @@
       box-sizing: border-box;
     }
 
+    html,
     body {
       margin: 0;
       padding: 0;
       font-family: Arial, sans-serif;
       background: #f4f5f7;
       color: #222;
+    }
+
+    body {
+      min-height: 100vh;
     }
 
     .header {
@@ -59,7 +65,7 @@
     }
 
     .product {
-      background: white;
+      background: #fff;
       border-radius: 14px;
       overflow: hidden;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
@@ -82,6 +88,7 @@
       font-weight: 600;
       min-height: 38px;
       line-height: 19px;
+      word-break: break-word;
     }
 
     .quantity {
@@ -92,6 +99,7 @@
       border: 1px solid #ddd;
       border-radius: 9px;
       overflow: hidden;
+      background: #fff;
     }
 
     .quantity button {
@@ -101,6 +109,11 @@
       background: #f2f3f5;
       font-size: 20px;
       cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .quantity button:active {
+      background: #ddd;
     }
 
     .quantity-value {
@@ -129,9 +142,15 @@
       font-size: 16px;
       font-weight: 700;
       cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .cart-button:disabled {
+      opacity: 0.6;
     }
 
     .loading {
+      grid-column: 1 / -1;
       text-align: center;
       padding: 50px 20px;
       color: #777;
@@ -143,95 +162,248 @@
       padding: 50px 20px;
       color: #777;
     }
+
+    .error-box {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 40px 20px;
+      color: #777;
+    }
+
+    .retry-button {
+      margin-top: 15px;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 18px;
+      background: #111;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
   </style>
 </head>
 
 <body>
 
   <div class="header">
-    <div class="title">AziKom</div>
+
+    <div class="title">
+      AziKom
+    </div>
 
     <input
       id="search"
       class="search"
       type="text"
       placeholder="Mahsulot qidirish..."
+      autocomplete="off"
     >
+
   </div>
 
+
   <div id="products" class="products">
+
     <div class="loading">
       Mahsulotlar yuklanmoqda...
     </div>
+
   </div>
+
 
   <div class="bottom">
-    <button id="cartButton" class="cart-button">
+
+    <button
+      id="cartButton"
+      class="cart-button"
+    >
       Savat — 0 ta
     </button>
+
   </div>
 
+
   <script>
+
+    // =====================================
+    // TELEGRAM
+    // =====================================
+
     const tg =
-      window.Telegram && window.Telegram.WebApp
+      window.Telegram &&
+      window.Telegram.WebApp
         ? window.Telegram.WebApp
         : null;
+
 
     if (tg) {
       tg.ready();
       tg.expand();
+
+      try {
+        tg.setHeaderColor("#ffffff");
+        tg.setBackgroundColor("#f4f5f7");
+      } catch (e) {
+        console.log("Telegram color error:", e);
+      }
     }
 
+
+    // =====================================
+    // VERCEL BACKEND
+    // =====================================
+
+    const API_BASE =
+      "https://xitoytavar.vercel.app";
+
+
+    // =====================================
+    // O'ZGARUVCHILAR
+    // =====================================
+
     let products = [];
+
     const cart = {};
+
 
     const productsContainer =
       document.getElementById("products");
 
+
     const searchInput =
       document.getElementById("search");
+
 
     const cartButton =
       document.getElementById("cartButton");
 
 
-    // =========================
+    // =====================================
     // MAHSULOTLARNI YUKLASH
-    // =========================
+    // =====================================
 
     async function loadProducts() {
+
+      productsContainer.innerHTML = `
+        <div class="loading">
+          Mahsulotlar yuklanmoqda...
+        </div>
+      `;
+
       try {
-        const response = await fetch("/api/products");
+
+        const url =
+          API_BASE +
+          "/api/products?t=" +
+          Date.now();
+
+
+        const response =
+          await fetch(
+            url,
+            {
+              method: "GET",
+              cache: "no-store"
+            }
+          );
+
+
+        console.log(
+          "Products status:",
+          response.status
+        );
+
 
         if (!response.ok) {
-          throw new Error("Products API error");
+
+          throw new Error(
+            "API status: " +
+            response.status
+          );
+
         }
 
-        const data = await response.json();
 
-        if (!data.ok) {
-          throw new Error("Products API returned error");
+        const data =
+          await response.json();
+
+
+        console.log(
+          "Products API:",
+          data
+        );
+
+
+        if (
+          !data ||
+          data.ok !== true ||
+          !Array.isArray(data.products)
+        ) {
+
+          throw new Error(
+            "API javobi noto'g'ri"
+          );
+
         }
 
-        products = data.products || [];
+
+        products =
+          data.products;
+
+
+        if (
+          products.length === 0
+        ) {
+
+          productsContainer.innerHTML = `
+            <div class="empty">
+              Hozircha mahsulotlar yo'q.
+            </div>
+          `;
+
+          return;
+        }
+
 
         renderProducts();
 
+
       } catch (error) {
-        console.error(error);
+
+        console.error(
+          "PRODUCT LOAD ERROR:",
+          error
+        );
+
 
         productsContainer.innerHTML = `
-          <div class="empty">
-            Mahsulotlarni yuklashda xatolik yuz berdi.
+
+          <div class="error-box">
+
+            Mahsulotlarni yuklashda
+            xatolik yuz berdi.
+
+            <br>
+
+            <button
+              class="retry-button"
+              onclick="loadProducts()"
+            >
+              Qayta urinish
+            </button>
+
           </div>
+
         `;
+
       }
+
     }
 
 
-    // =========================
+    // =====================================
     // MAHSULOTLARNI CHIQARISH
-    // =========================
+    // =====================================
 
     function renderProducts() {
 
@@ -240,131 +412,197 @@
           .trim()
           .toLowerCase();
 
-      const filtered =
-        products.filter(product =>
-          product.name
-            .toLowerCase()
-            .includes(search)
-        );
 
-      if (filtered.length === 0) {
+      const filtered =
+        products.filter(product => {
+
+          const name =
+            String(
+              product.name || ""
+            ).toLowerCase();
+
+          return name.includes(search);
+
+        });
+
+
+      if (
+        filtered.length === 0
+      ) {
+
         productsContainer.innerHTML = `
+
           <div class="empty">
             Mahsulot topilmadi.
           </div>
+
         `;
+
+        updateCartButton();
 
         return;
       }
 
+
       productsContainer.innerHTML =
-        filtered.map(product => {
+        filtered
+          .map(product => {
 
-          const quantity =
-            cart[product.id] || 0;
+            const quantity =
+              cart[product.id] || 0;
 
-          const imageUrl =
-            "/api/image?file_id=" +
-            encodeURIComponent(
-              product.photo_file_id
-            );
 
-          return `
-            <div class="product">
+            const imageUrl =
+              API_BASE +
+              "/api/image?file_id=" +
+              encodeURIComponent(
+                product.photo_file_id
+              ) +
+              "&t=" +
+              Date.now();
 
-              <img
-                class="product-image"
-                src="${imageUrl}"
-                alt="${escapeHtml(product.name)}"
-                loading="lazy"
-              >
 
-              <div class="product-info">
+            return `
 
-                <div class="product-name">
-                  ${escapeHtml(product.name)}
-                </div>
+              <div class="product">
 
-                <div class="quantity">
+                <img
+                  class="product-image"
+                  src="${imageUrl}"
+                  alt="${escapeHtml(product.name)}"
+                  loading="lazy"
+                  onerror="this.style.display='none'"
+                >
 
-                  <button
-                    onclick="changeQuantity(${product.id}, -1)"
-                  >
-                    −
-                  </button>
 
-                  <span class="quantity-value">
-                    ${quantity}
-                  </span>
+                <div class="product-info">
 
-                  <button
-                    onclick="changeQuantity(${product.id}, 1)"
-                  >
-                    +
-                  </button>
+                  <div class="product-name">
+                    ${escapeHtml(product.name)}
+                  </div>
+
+
+                  <div class="quantity">
+
+                    <button
+                      type="button"
+                      onclick="changeQuantity(${Number(product.id)}, -1)"
+                    >
+                      −
+                    </button>
+
+
+                    <span class="quantity-value">
+                      ${quantity}
+                    </span>
+
+
+                    <button
+                      type="button"
+                      onclick="changeQuantity(${Number(product.id)}, 1)"
+                    >
+                      +
+                    </button>
+
+                  </div>
 
                 </div>
 
               </div>
 
-            </div>
-          `;
-        }).join("");
+            `;
+
+          })
+          .join("");
+
 
       updateCartButton();
+
     }
 
 
-    // =========================
-    // MIQDOR
-    // =========================
+    // =====================================
+    // MIQDORNI O'ZGARTIRISH
+    // =====================================
 
-    function changeQuantity(id, change) {
+    function changeQuantity(
+      id,
+      change
+    ) {
 
       const current =
-        cart[id] || 0;
+        Number(
+          cart[id] || 0
+        );
+
 
       const newValue =
         current + change;
 
-      if (newValue <= 0) {
+
+      if (
+        newValue <= 0
+      ) {
+
         delete cart[id];
+
       } else {
-        cart[id] = newValue;
+
+        cart[id] =
+          newValue;
+
       }
 
+
       renderProducts();
+
     }
 
 
-    // =========================
-    // SAVAT
-    // =========================
+    // =====================================
+    // JAMI MIQDOR
+    // =====================================
 
     function getTotalQuantity() {
 
       return Object.values(cart)
         .reduce(
-          (sum, quantity) =>
-            sum + quantity,
+          (
+            sum,
+            quantity
+          ) => {
+
+            return (
+              sum +
+              Number(quantity)
+            );
+
+          },
           0
         );
+
     }
 
+
+    // =====================================
+    // SAVAT TUGMASI
+    // =====================================
 
     function updateCartButton() {
 
       const total =
         getTotalQuantity();
 
+
       cartButton.textContent =
         `Savat — ${total} ta`;
+
     }
 
 
-    // =========================
-    // BUYURTMA
-    // =========================
+    // =====================================
+    // BUYURTMA YUBORISH
+    // =====================================
 
     cartButton.addEventListener(
       "click",
@@ -372,102 +610,201 @@
     );
 
 
-async function sendOrder() {
-  const items = Object.entries(cart)
-    .map(([id, quantity]) => {
-      const product = products.find(
-        p => p.id == id
-      );
+    async function sendOrder() {
 
-      if (!product) {
-        return null;
+      const items =
+        Object.entries(cart)
+          .map(
+            (
+              [id, quantity]
+            ) => {
+
+              const product =
+                products.find(
+                  p =>
+                    Number(p.id) ===
+                    Number(id)
+                );
+
+
+              if (!product) {
+                return null;
+              }
+
+
+              return {
+
+                id:
+                  Number(product.id),
+
+                quantity:
+                  Number(quantity)
+
+              };
+
+            }
+          )
+          .filter(Boolean);
+
+
+      // Savat bo'sh
+      if (
+        items.length === 0
+      ) {
+
+        if (tg) {
+
+          tg.showAlert(
+            "Avval mahsulot miqdorini tanlang."
+          );
+
+        } else {
+
+          alert(
+            "Avval mahsulot miqdorini tanlang."
+          );
+
+        }
+
+        return;
       }
 
-      return {
-        id: product.id,
-        quantity: quantity
-      };
-    })
-    .filter(Boolean);
 
-  if (items.length === 0) {
-    if (tg) {
-      tg.showAlert(
-        "Avval mahsulot miqdorini tanlang."
-      );
-    } else {
-      alert(
-        "Avval mahsulot miqdorini tanlang."
-      );
+      // Telegram ichida ochilganini tekshirish
+      if (
+        !tg ||
+        !tg.initData
+      ) {
+
+        alert(
+          "Buyurtma faqat Telegram Mini App orqali beriladi."
+        );
+
+        return;
+
+      }
+
+
+      try {
+
+        cartButton.disabled =
+          true;
+
+        cartButton.textContent =
+          "Yuborilmoqda...";
+
+
+        const response =
+          await fetch(
+            API_BASE +
+            "/api/order",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body:
+                JSON.stringify({
+
+                  items:
+                    items,
+
+                  initData:
+                    tg.initData
+
+                })
+
+            }
+          );
+
+
+        const result =
+          await response.json();
+
+
+        console.log(
+          "Order response:",
+          result
+        );
+
+
+        if (
+          !response.ok ||
+          !result.ok
+        ) {
+
+          throw new Error(
+            result.error ||
+            "Buyurtma yuborilmadi"
+          );
+
+        }
+
+
+        // Savatni tozalash
+        Object.keys(cart)
+          .forEach(
+            key =>
+              delete cart[key]
+          );
+
+
+        cartButton.disabled =
+          false;
+
+
+        cartButton.textContent =
+          "Savat — 0 ta";
+
+
+        renderProducts();
+
+
+        tg.showAlert(
+          "✅ Buyurtmangiz qabul qilindi!"
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          "ORDER ERROR:",
+          error
+        );
+
+
+        cartButton.disabled =
+          false;
+
+
+        updateCartButton();
+
+
+        if (tg) {
+
+          tg.showAlert(
+            "❌ Buyurtmani yuborishda xatolik yuz berdi."
+          );
+
+        } else {
+
+          alert(
+            "❌ Buyurtmani yuborishda xatolik yuz berdi."
+          );
+
+        }
+
+      }
+
     }
 
-    return;
-  }
 
-  if (!tg || !tg.initData) {
-    alert(
-      "Buyurtma faqat Telegram Mini App orqali beriladi."
-    );
-    return;
-  }
-
-  try {
-    cartButton.disabled = true;
-    cartButton.textContent = "Yuborilmoqda...";
-
-    const response = await fetch("/api/order", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        items: items,
-        initData: tg.initData
-      })
-    });
-
-    const result = await response.json();
-
-    if (!response.ok || !result.ok) {
-      throw new Error(
-        result.error ||
-        "Buyurtma yuborilmadi"
-      );
-    }
-
-    cartButton.disabled = false;
-    cartButton.textContent = "Savat — 0 ta";
-
-    // Savatni tozalash
-    Object.keys(cart).forEach(
-      key => delete cart[key]
-    );
-
-    renderProducts();
-
-    tg.showAlert(
-      "✅ Buyurtmangiz qabul qilindi!"
-    );
-
-  } catch (error) {
-    console.error(
-      "ORDER ERROR:",
-      error
-    );
-
-    cartButton.disabled = false;
-    updateCartButton();
-
-    tg.showAlert(
-      "❌ Buyurtmani yuborishda xatolik yuz berdi."
-    );
-  }
-}
-
-
-    // =========================
+    // =====================================
     // QIDIRUV
-    // =========================
+    // =====================================
 
     searchInput.addEventListener(
       "input",
@@ -475,39 +812,45 @@ async function sendOrder() {
     );
 
 
-    // =========================
+    // =====================================
     // XAVFSIZ HTML
-    // =========================
+    // =====================================
 
     function escapeHtml(text) {
 
       return String(text)
+
         .replace(
           /&/g,
           "&amp;"
         )
+
         .replace(
           /</g,
           "&lt;"
         )
+
         .replace(
           />/g,
           "&gt;"
         )
+
         .replace(
           /"/g,
           "&quot;"
         )
+
         .replace(
           /'/g,
           "&#039;"
         );
+
     }
 
 
-    // =========================
+    // =====================================
     // START
-    // =========================
+    // =====================================
 
     loadProducts();
 
