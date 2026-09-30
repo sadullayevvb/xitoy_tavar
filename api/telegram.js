@@ -23,7 +23,10 @@ export default async function handler(req, res) {
   try {
     const update = req.body;
 
-    // Jadvalni avtomatik yaratamiz
+    // =========================
+    // JADVALNI YARATISH
+    // =========================
+
     await sql`
       CREATE TABLE IF NOT EXISTS products (
         id SERIAL PRIMARY KEY,
@@ -36,12 +39,60 @@ export default async function handler(req, res) {
       )
     `;
 
-    // Faqat yangi yoki tahrirlangan kanal postlari
+    await sql`
+      CREATE TABLE IF NOT EXISTS bot_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    `;
+
+
+    // =========================
+    // BUYURTMA GURUHINI ANIQLASH
+    // =========================
+
+    if (update.message) {
+      const message = update.message;
+      const chat = message.chat;
+
+      if (
+        chat &&
+        (chat.type === "group" ||
+         chat.type === "supergroup")
+      ) {
+        await sql`
+          INSERT INTO bot_settings (key, value)
+          VALUES (
+            'order_group_chat_id',
+            ${String(chat.id)}
+          )
+          ON CONFLICT (key)
+          DO UPDATE SET
+            value = EXCLUDED.value
+        `;
+
+        console.log(
+          "ORDER GROUP ID:",
+          chat.id
+        );
+
+        return res.status(200).json({
+          ok: true,
+          action: "group_saved",
+          chat_id: chat.id
+        });
+      }
+    }
+
+
+    // =========================
+    // KANAL POSTI
+    // =========================
+
     const post =
       update.channel_post ||
       update.edited_channel_post;
 
-    // Kanal posti bo'lmasa o'tkazib yuboramiz
     if (!post) {
       return res.status(200).json({
         ok: true,
@@ -49,8 +100,12 @@ export default async function handler(req, res) {
       });
     }
 
+
     // FAQAT RASMLI POSTLAR
-    if (!post.photo || post.photo.length === 0) {
+    if (
+      !post.photo ||
+      post.photo.length === 0
+    ) {
       return res.status(200).json({
         ok: true,
         ignored: true,
@@ -58,36 +113,69 @@ export default async function handler(req, res) {
       });
     }
 
-    const channelId = String(post.chat.id);
-    const messageId = post.message_id;
 
-    // Eng katta rasm variantini olamiz
+    const channelId =
+      String(post.chat.id);
+
+    const messageId =
+      post.message_id;
+
+
+    // Eng katta rasm
     const photoFileId =
-      post.photo[post.photo.length - 1].file_id;
+      post.photo[
+        post.photo.length - 1
+      ].file_id;
 
-    // Caption
+
+    // Mahsulot nomi
     const name = (
       post.caption ||
       "Nomsiz mahsulot"
     ).trim();
 
-    // Bazaga qo'shish yoki yangilash
+
+    // =========================
+    // MAHSULOTNI SAQLASH
+    // =========================
+
     await sql`
       INSERT INTO products
-        (channel_id, message_id, name, photo_file_id)
+        (
+          channel_id,
+          message_id,
+          name,
+          photo_file_id
+        )
       VALUES
-        (${channelId}, ${messageId}, ${name}, ${photoFileId})
-      ON CONFLICT (channel_id, message_id)
+        (
+          ${channelId},
+          ${messageId},
+          ${name},
+          ${photoFileId}
+        )
+      ON CONFLICT
+        (channel_id, message_id)
       DO UPDATE SET
         name = EXCLUDED.name,
         photo_file_id = EXCLUDED.photo_file_id
     `;
 
+
+    console.log(
+      "PRODUCT SAVED:",
+      name
+    );
+
+
     return res.status(200).json({
       ok: true,
-      action: update.edited_channel_post
-        ? "updated"
-        : "created",
+
+      action:
+        update.edited_channel_post
+          ? "updated"
+          : "created",
+
       product: {
         channelId,
         messageId,
@@ -96,8 +184,13 @@ export default async function handler(req, res) {
       }
     });
 
+
   } catch (error) {
-    console.error("TELEGRAM WEBHOOK ERROR:", error);
+
+    console.error(
+      "TELEGRAM WEBHOOK ERROR:",
+      error
+    );
 
     return res.status(500).json({
       ok: false,
