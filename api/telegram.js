@@ -23,10 +23,6 @@ export default async function handler(req, res) {
   try {
     const update = req.body;
 
-    // =========================
-    // JADVALNI YARATISH
-    // =========================
-
     await sql`
       CREATE TABLE IF NOT EXISTS products (
         id SERIAL PRIMARY KEY,
@@ -40,41 +36,38 @@ export default async function handler(req, res) {
     `;
 
     await sql`
+      CREATE TABLE IF NOT EXISTS catalog_products (
+        id SERIAL PRIMARY KEY,
+        source_product_id INTEGER UNIQUE NULL,
+        name TEXT NOT NULL,
+        photo_file_id TEXT NOT NULL,
+        is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TIMESTAMP NULL
+      )
+    `;
+
+    await sql`
       CREATE TABLE IF NOT EXISTS bot_settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       )
     `;
 
-
-    // =========================
-    // BUYURTMA GURUHINI ANIQLASH
-    // =========================
-
     if (update.message) {
       const message = update.message;
       const chat = message.chat;
 
-      if (
-        chat &&
-        (chat.type === "group" ||
-         chat.type === "supergroup")
-      ) {
+      if (chat && (chat.type === "group" || chat.type === "supergroup")) {
         await sql`
           INSERT INTO bot_settings (key, value)
-          VALUES (
-            'order_group_chat_id',
-            ${String(chat.id)}
-          )
+          VALUES ('order_group_chat_id', ${String(chat.id)})
           ON CONFLICT (key)
-          DO UPDATE SET
-            value = EXCLUDED.value
+          DO UPDATE SET value = EXCLUDED.value
         `;
 
-        console.log(
-          "ORDER GROUP ID:",
-          chat.id
-        );
+        console.log("ORDER GROUP ID:", chat.id);
 
         return res.status(200).json({
           ok: true,
@@ -84,28 +77,13 @@ export default async function handler(req, res) {
       }
     }
 
-
-    // =========================
-    // KANAL POSTI
-    // =========================
-
-    const post =
-      update.channel_post ||
-      update.edited_channel_post;
+    const post = update.channel_post || update.edited_channel_post;
 
     if (!post) {
-      return res.status(200).json({
-        ok: true,
-        ignored: true
-      });
+      return res.status(200).json({ ok: true, ignored: true });
     }
 
-
-    // FAQAT RASMLI POSTLAR
-    if (
-      !post.photo ||
-      post.photo.length === 0
-    ) {
+    if (!post.photo || post.photo.length === 0) {
       return res.status(200).json({
         ok: true,
         ignored: true,
@@ -113,69 +91,51 @@ export default async function handler(req, res) {
       });
     }
 
+    const channelId = String(post.chat.id);
+    const messageId = post.message_id;
+    const photoFileId = post.photo[post.photo.length - 1].file_id;
+    const name = (post.caption || "Nomsiz mahsulot").trim();
 
-    const channelId =
-      String(post.chat.id);
-
-    const messageId =
-      post.message_id;
-
-
-    // Eng katta rasm
-    const photoFileId =
-      post.photo[
-        post.photo.length - 1
-      ].file_id;
-
-
-    // Mahsulot nomi
-    const name = (
-      post.caption ||
-      "Nomsiz mahsulot"
-    ).trim();
-
-
-    // =========================
-    // MAHSULOTNI SAQLASH
-    // =========================
+    const existing = await sql`
+      SELECT id
+      FROM products
+      WHERE channel_id = ${channelId}
+        AND message_id = ${messageId}
+      LIMIT 1
+    `;
 
     await sql`
-      INSERT INTO products
-        (
-          channel_id,
-          message_id,
-          name,
-          photo_file_id
-        )
-      VALUES
-        (
-          ${channelId},
-          ${messageId},
-          ${name},
-          ${photoFileId}
-        )
-      ON CONFLICT
-        (channel_id, message_id)
+      INSERT INTO products (channel_id, message_id, name, photo_file_id)
+      VALUES (${channelId}, ${messageId}, ${name}, ${photoFileId})
+      ON CONFLICT (channel_id, message_id)
       DO UPDATE SET
         name = EXCLUDED.name,
         photo_file_id = EXCLUDED.photo_file_id
     `;
 
+    if (!existing.length) {
+      const source = await sql`
+        SELECT id
+        FROM products
+        WHERE channel_id = ${channelId}
+          AND message_id = ${messageId}
+        LIMIT 1
+      `;
 
-    console.log(
-      "PRODUCT SAVED:",
-      name
-    );
+      if (source.length) {
+        await sql`
+          INSERT INTO catalog_products (source_product_id, name, photo_file_id)
+          VALUES (${source[0].id}, ${name}, ${photoFileId})
+          ON CONFLICT (source_product_id) DO NOTHING
+        `;
+      }
+    }
 
+    console.log("PRODUCT SAVED:", name);
 
     return res.status(200).json({
       ok: true,
-
-      action:
-        update.edited_channel_post
-          ? "updated"
-          : "created",
-
+      action: update.edited_channel_post ? "updated" : "created",
       product: {
         channelId,
         messageId,
@@ -183,18 +143,8 @@ export default async function handler(req, res) {
         hasPhoto: true
       }
     });
-
-
   } catch (error) {
-
-    console.error(
-      "TELEGRAM WEBHOOK ERROR:",
-      error
-    );
-
-    return res.status(500).json({
-      ok: false,
-      error: "Server error"
-    });
+    console.error("TELEGRAM WEBHOOK ERROR:", error);
+    return res.status(500).json({ ok: false, error: "Server error" });
   }
 }
