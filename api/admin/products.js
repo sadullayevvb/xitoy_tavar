@@ -10,27 +10,11 @@ function cors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
-async function ensureTables() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS catalog_products (
-      id SERIAL PRIMARY KEY,
-      source_product_id INTEGER UNIQUE NULL,
-      name TEXT NOT NULL,
-      photo_file_id TEXT NOT NULL,
-      is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      deleted_at TIMESTAMP NULL
-    )
-  `;
-
-  await sql`
-    INSERT INTO catalog_products (source_product_id, name, photo_file_id)
-    SELECT p.id, p.name, p.photo_file_id
-    FROM products p
-    LEFT JOIN catalog_products c ON c.source_product_id = p.id
-    WHERE c.id IS NULL
-  `;
+async function ensureColumns() {
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS admin_edited BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`;
 }
 
 export default async function handler(req, res) {
@@ -39,68 +23,52 @@ export default async function handler(req, res) {
   if (!requireAdmin(req, res)) return;
 
   try {
-    await ensureTables();
+    await ensureColumns();
     const id = Number(req.query?.id || req.body?.id || 0);
 
     if (req.method === "GET") {
       const trash = String(req.query?.trash || "0") === "1";
       const rows = trash
         ? await sql`
-            SELECT id, source_product_id, name, photo_file_id, is_deleted, created_at, updated_at, deleted_at
-            FROM catalog_products
-            WHERE is_deleted = TRUE
-            ORDER BY id DESC
+            SELECT id, channel_id, message_id, name, photo_file_id, is_deleted, admin_edited, created_at, updated_at, deleted_at
+            FROM products WHERE is_deleted = TRUE ORDER BY id DESC
           `
         : await sql`
-            SELECT id, source_product_id, name, photo_file_id, is_deleted, created_at, updated_at, deleted_at
-            FROM catalog_products
-            ORDER BY id DESC
+            SELECT id, channel_id, message_id, name, photo_file_id, is_deleted, admin_edited, created_at, updated_at, deleted_at
+            FROM products WHERE is_deleted = FALSE ORDER BY id DESC
           `;
-
       return res.status(200).json({ ok: true, products: rows });
     }
 
     if (req.method === "POST") {
       const name = String(req.body?.name || "").trim();
       const photoFileId = String(req.body?.photo_file_id || "").trim();
+      if (!name || !photoFileId) return res.status(400).json({ ok: false, error: "Nomi va rasm kerak" });
 
-      if (!name || !photoFileId) {
-        return res.status(400).json({ ok: false, error: "Nomi va rasm kerak" });
-      }
-
+      const messageId = -Date.now();
       const rows = await sql`
-        INSERT INTO catalog_products (source_product_id, name, photo_file_id)
-        VALUES (NULL, ${name}, ${photoFileId})
-        RETURNING id, source_product_id, name, photo_file_id, is_deleted, created_at, updated_at, deleted_at
+        INSERT INTO products (channel_id, message_id, name, photo_file_id, is_deleted, admin_edited, updated_at)
+        VALUES ('admin', ${messageId}, ${name}, ${photoFileId}, FALSE, TRUE, CURRENT_TIMESTAMP)
+        RETURNING id, channel_id, message_id, name, photo_file_id, is_deleted, admin_edited, created_at, updated_at, deleted_at
       `;
-
       return res.status(201).json({ ok: true, product: rows[0] });
     }
 
-    if (!Number.isSafeInteger(id) || id <= 0) {
-      return res.status(400).json({ ok: false, error: "Mahsulot ID noto'g'ri" });
-    }
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ ok: false, error: "Mahsulot ID noto'g'ri" });
 
     if (req.method === "PATCH") {
       if (String(req.body?.action || "") === "restore") {
         const rows = await sql`
-          UPDATE catalog_products
-          SET is_deleted = FALSE,
-              deleted_at = NULL,
-              updated_at = CURRENT_TIMESTAMP
+          UPDATE products
+          SET is_deleted = FALSE, deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
           WHERE id = ${id}
-          RETURNING id, source_product_id, name, photo_file_id, is_deleted, created_at, updated_at, deleted_at
+          RETURNING id, channel_id, message_id, name, photo_file_id, is_deleted, admin_edited, created_at, updated_at, deleted_at
         `;
         if (!rows.length) return res.status(404).json({ ok: false, error: "Mahsulot topilmadi" });
         return res.status(200).json({ ok: true, product: rows[0] });
       }
 
-      const current = await sql`
-        SELECT id, name, photo_file_id
-        FROM catalog_products
-        WHERE id = ${id}
-        LIMIT 1
-      `;
+      const current = await sql`SELECT id, name, photo_file_id FROM products WHERE id = ${id} LIMIT 1`;
       if (!current.length) return res.status(404).json({ ok: false, error: "Mahsulot topilmadi" });
 
       const name = String(req.body?.name ?? current[0].name).trim();
@@ -108,25 +76,20 @@ export default async function handler(req, res) {
       if (!name || !photoFileId) return res.status(400).json({ ok: false, error: "Nomi va rasm kerak" });
 
       const rows = await sql`
-        UPDATE catalog_products
-        SET name = ${name},
-            photo_file_id = ${photoFileId},
-            updated_at = CURRENT_TIMESTAMP
+        UPDATE products
+        SET name = ${name}, photo_file_id = ${photoFileId}, admin_edited = TRUE, updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
-        RETURNING id, source_product_id, name, photo_file_id, is_deleted, created_at, updated_at, deleted_at
+        RETURNING id, channel_id, message_id, name, photo_file_id, is_deleted, admin_edited, created_at, updated_at, deleted_at
       `;
-
       return res.status(200).json({ ok: true, product: rows[0] });
     }
 
     if (req.method === "DELETE") {
       const rows = await sql`
-        UPDATE catalog_products
-        SET is_deleted = TRUE,
-            deleted_at = CURRENT_TIMESTAMP,
-            updated_at = CURRENT_TIMESTAMP
+        UPDATE products
+        SET is_deleted = TRUE, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
-        RETURNING id, source_product_id, name, photo_file_id, is_deleted, created_at, updated_at, deleted_at
+        RETURNING id, channel_id, message_id, name, photo_file_id, is_deleted, admin_edited, created_at, updated_at, deleted_at
       `;
       if (!rows.length) return res.status(404).json({ ok: false, error: "Mahsulot topilmadi" });
       return res.status(200).json({ ok: true, product: rows[0] });
