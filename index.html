@@ -216,6 +216,7 @@
     <button
       id="cartButton"
       class="cart-button"
+      type="button"
     >
       Savat — 0 ta
     </button>
@@ -237,15 +238,26 @@
 
 
     if (tg) {
+
       tg.ready();
+
       tg.expand();
 
       try {
+
         tg.setHeaderColor("#ffffff");
+
         tg.setBackgroundColor("#f4f5f7");
+
       } catch (e) {
-        console.log("Telegram color error:", e);
+
+        console.log(
+          "Telegram color error:",
+          e
+        );
+
       }
+
     }
 
 
@@ -267,15 +279,21 @@
 
 
     const productsContainer =
-      document.getElementById("products");
+      document.getElementById(
+        "products"
+      );
 
 
     const searchInput =
-      document.getElementById("search");
+      document.getElementById(
+        "search"
+      );
 
 
     const cartButton =
-      document.getElementById("cartButton");
+      document.getElementById(
+        "cartButton"
+      );
 
 
     // =====================================
@@ -285,10 +303,13 @@
     async function loadProducts() {
 
       productsContainer.innerHTML = `
+
         <div class="loading">
           Mahsulotlar yuklanmoqda...
         </div>
+
       `;
+
 
       try {
 
@@ -337,7 +358,9 @@
         if (
           !data ||
           data.ok !== true ||
-          !Array.isArray(data.products)
+          !Array.isArray(
+            data.products
+          )
         ) {
 
           throw new Error(
@@ -356,12 +379,15 @@
         ) {
 
           productsContainer.innerHTML = `
+
             <div class="empty">
               Hozircha mahsulotlar yo'q.
             </div>
+
           `;
 
           return;
+
         }
 
 
@@ -387,6 +413,7 @@
 
             <button
               class="retry-button"
+              type="button"
               onclick="loadProducts()"
             >
               Qayta urinish
@@ -414,16 +441,21 @@
 
 
       const filtered =
-        products.filter(product => {
+        products.filter(
+          product => {
 
-          const name =
-            String(
-              product.name || ""
-            ).toLowerCase();
+            const name =
+              String(
+                product.name || ""
+              ).toLowerCase();
 
-          return name.includes(search);
 
-        });
+            return name.includes(
+              search
+            );
+
+          }
+        );
 
 
       if (
@@ -441,78 +473,106 @@
         updateCartButton();
 
         return;
+
       }
 
 
       productsContainer.innerHTML =
         filtered
-          .map(product => {
+          .map(
+            product => {
 
-            const quantity =
-              cart[product.id] || 0;
-
-
-            const imageUrl =
-              API_BASE +
-              "/api/image?file_id=" +
-              encodeURIComponent(
-                product.photo_file_id
-              ) +
-              "&t=" +
-              Date.now();
+              const quantity =
+                Number(
+                  cart[product.id] || 0
+                );
 
 
-            return `
+              /*
+               * Muhim:
+               * Date.now() faqat renderProducts()
+               * ishlaganda qo'shiladi.
+               *
+               * + / - endi renderProducts()
+               * chaqirmaydi.
+               */
 
-              <div class="product">
+              const imageUrl =
+                API_BASE +
+                "/api/image?file_id=" +
+                encodeURIComponent(
+                  product.photo_file_id
+                );
 
-                <img
-                  class="product-image"
-                  src="${imageUrl}"
-                  alt="${escapeHtml(product.name)}"
-                  loading="lazy"
-                  onerror="this.style.display='none'"
+
+              return `
+
+                <div
+                  class="product"
+                  data-product-id="${Number(product.id)}"
                 >
 
-
-                <div class="product-info">
-
-                  <div class="product-name">
-                    ${escapeHtml(product.name)}
-                  </div>
-
-
-                  <div class="quantity">
-
-                    <button
-                      type="button"
-                      onclick="changeQuantity(${Number(product.id)}, -1)"
-                    >
-                      −
-                    </button>
+                  <img
+                    class="product-image"
+                    src="${imageUrl}"
+                    alt="${escapeHtml(
+                      product.name
+                    )}"
+                    loading="lazy"
+                    onerror="this.style.display='none'"
+                  >
 
 
-                    <span class="quantity-value">
-                      ${quantity}
-                    </span>
+                  <div class="product-info">
+
+                    <div class="product-name">
+                      ${escapeHtml(
+                        product.name
+                      )}
+                    </div>
 
 
-                    <button
-                      type="button"
-                      onclick="changeQuantity(${Number(product.id)}, 1)"
-                    >
-                      +
-                    </button>
+                    <div class="quantity">
+
+                      <button
+                        type="button"
+                        onclick="changeQuantity(
+                          ${Number(product.id)},
+                          -1
+                        )"
+                      >
+                        −
+                      </button>
+
+
+                      <span
+                        class="quantity-value"
+                        data-quantity-id="${Number(product.id)}"
+                      >
+                        ${quantity}
+                      </span>
+
+
+                      <button
+                        type="button"
+                        onclick="changeQuantity(
+                          ${Number(product.id)},
+                          1
+                        )"
+                      >
+                        +
+                      </button>
+
+                    </div>
 
                   </div>
 
                 </div>
 
-              </div>
+              `;
 
-            `;
-
-          })
+            }
+          )
           .join("");
 
 
@@ -554,7 +614,38 @@
       }
 
 
-      renderProducts();
+      /*
+       * MUHIM:
+       *
+       * Bu yerda renderProducts()
+       * YO'Q.
+       *
+       * Shuning uchun:
+       *
+       * + bosilganda
+       * ❌ rasm qayta yuklanmaydi
+       * ❌ sahifa qayta chizilmaydi
+       * ❌ API qayta chaqirilmaydi
+       *
+       * Faqat son o'zgaradi.
+       */
+
+
+      const quantityElement =
+        document.querySelector(
+          `[data-quantity-id="${id}"]`
+        );
+
+
+      if (quantityElement) {
+
+        quantityElement.textContent =
+          cart[id] || 0;
+
+      }
+
+
+      updateCartButton();
 
     }
 
@@ -565,21 +656,22 @@
 
     function getTotalQuantity() {
 
-      return Object.values(cart)
-        .reduce(
-          (
-            sum,
-            quantity
-          ) => {
+      return Object.values(
+        cart
+      ).reduce(
+        (
+          sum,
+          quantity
+        ) => {
 
-            return (
-              sum +
-              Number(quantity)
-            );
+          return (
+            sum +
+            Number(quantity)
+          );
 
-          },
-          0
-        );
+        },
+        0
+      );
 
     }
 
@@ -601,7 +693,7 @@
 
 
     // =====================================
-    // BUYURTMA YUBORISH
+    // BUYURTMA
     // =====================================
 
     cartButton.addEventListener(
@@ -613,41 +705,48 @@
     async function sendOrder() {
 
       const items =
-        Object.entries(cart)
-          .map(
-            (
-              [id, quantity]
-            ) => {
+        Object.entries(
+          cart
+        )
+        .map(
+          (
+            [id, quantity]
+          ) => {
 
-              const product =
-                products.find(
-                  p =>
-                    Number(p.id) ===
-                    Number(id)
-                );
-
-
-              if (!product) {
-                return null;
-              }
+            const product =
+              products.find(
+                p =>
+                  Number(p.id) ===
+                  Number(id)
+              );
 
 
-              return {
+            if (!product) {
 
-                id:
-                  Number(product.id),
-
-                quantity:
-                  Number(quantity)
-
-              };
+              return null;
 
             }
-          )
-          .filter(Boolean);
 
 
-      // Savat bo'sh
+            return {
+
+              id:
+                Number(product.id),
+
+              quantity:
+                Number(quantity)
+
+            };
+
+          }
+        )
+        .filter(Boolean);
+
+
+      // =====================================
+      // SAVAT BO'SH
+      // =====================================
+
       if (
         items.length === 0
       ) {
@@ -667,10 +766,14 @@
         }
 
         return;
+
       }
 
 
-      // Telegram ichida ochilganini tekshirish
+      // =====================================
+      // TELEGRAM TEKSHIRISH
+      // =====================================
+
       if (
         !tg ||
         !tg.initData
@@ -690,6 +793,7 @@
         cartButton.disabled =
           true;
 
+
         cartButton.textContent =
           "Yuborilmoqda...";
 
@@ -699,11 +803,14 @@
             API_BASE +
             "/api/order",
             {
+
               method: "POST",
 
               headers: {
+
                 "Content-Type":
                   "application/json"
+
               },
 
               body:
@@ -744,23 +851,46 @@
         }
 
 
-        // Savatni tozalash
-        Object.keys(cart)
-          .forEach(
-            key =>
-              delete cart[key]
-          );
+        // =====================================
+        // SAVATNI TOZALASH
+        // =====================================
+
+        Object.keys(
+          cart
+        ).forEach(
+          key => {
+            delete cart[key];
+          }
+        );
 
 
         cartButton.disabled =
           false;
 
 
-        cartButton.textContent =
-          "Savat — 0 ta";
+        updateCartButton();
 
 
-        renderProducts();
+        /*
+         * Buyurtma muvaffaqiyatli bo'lgandan
+         * keyin UI'dagi sonlarni 0 qilamiz.
+         *
+         * Mahsulotlarni API'dan qayta
+         * yuklamaymiz.
+         */
+
+        document
+          .querySelectorAll(
+            ".quantity-value"
+          )
+          .forEach(
+            element => {
+
+              element.textContent =
+                "0";
+
+            }
+          );
 
 
         tg.showAlert(
@@ -816,9 +946,13 @@
     // XAVFSIZ HTML
     // =====================================
 
-    function escapeHtml(text) {
+    function escapeHtml(
+      text
+    ) {
 
-      return String(text)
+      return String(
+        text
+      )
 
         .replace(
           /&/g,
