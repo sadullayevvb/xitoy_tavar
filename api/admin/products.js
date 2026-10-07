@@ -83,15 +83,16 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "DELETE") {
-      const rows = await sql`
-        UPDATE products SET is_deleted = TRUE, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${id}
-        RETURNING id, channel_id, message_id, name, photo_file_id, stock_qty, is_deleted, admin_edited, created_at, updated_at, deleted_at
-      `;
+      const permanent = String(req.body?.action || "") === "permanent_delete";
+      if (permanent) {
+        const rows = await sql`DELETE FROM products WHERE id = ${id} AND is_deleted = TRUE RETURNING id, name`;
+        if (!rows.length) return res.status(404).json({ ok: false, error: "Chiqindidagi mahsulot topilmadi" });
+        return res.status(200).json({ ok: true, deleted: rows[0] });
+      }
+      const rows = await sql`UPDATE products SET is_deleted = TRUE, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ${id} RETURNING id, channel_id, message_id, name, photo_file_id, stock_qty, is_deleted, admin_edited, created_at, updated_at, deleted_at`;
       if (!rows.length) return res.status(404).json({ ok: false, error: "Mahsulot topilmadi" });
       return res.status(200).json({ ok: true, product: rows[0] });
     }
-
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   } catch (error) {
     console.error("ADMIN PRODUCTS ERROR:", error);
