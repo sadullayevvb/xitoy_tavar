@@ -9,11 +9,11 @@ async function ensure(){
  for(const name of defaults) await sql`INSERT INTO categories(name) VALUES (${name}) ON CONFLICT (name) DO NOTHING`;
  const cats=await sql`SELECT id,name FROM categories WHERE name <> 'Boshqa'`;
  for(const c of cats){
-  let pattern = c.name==="Korzinalar" ? "(korzina|корзин|basket)" : c.name==="Oshxona buyumlari" ? "(oshxona|кухн|кухон|нож|кухонн)" : c.name==="Ilgak va osmalar" ? "(вешал|плечик|hanger|vishel|veshal|ilgich|kiyim ilgich|ilgak|крюч|креплен|липуч)" : c.name==="Unitaz vanna" ? "(ершик|ёршик|ершики|ёршики|yorshik|yorsh|ershik|ерш|вантуз|avntuz|vantuz|унитаз|unitaz|ванна|vanna)" : c.name==="Tozalash vositalari" ? "(tozal|щетк|губк|швабр)" : c.name==="Aksessuarlar" ? "(aksessuar|брелок|чехол)" : c.name==="Uy-ro‘zg‘or buyumlari" ? "(uy|дом|хранен)" : "";
+  let pattern = c.name==="Korzinalar" ? "(korzina|корзин|basket)" : c.name==="Oshxona buyumlari" ? "(oshxona|кухн|кухон|нож|кухонн)" : c.name==="Ilgak va osmalar" ? "(вешал|плечик|hanger|vishel|veshal|ilgich|kiyim ilgich|ilgak|крюч|креплен|липуч)" : c.name==="Unitaz vanna" ? "(ершик|ёршик|ершики|ёршики|yorshik|yorsh|ershik|ерш|вантуз|avntuz|vantuz|унитаз|unitaz|ванна|vanna|туалет|toilet|wc|щетк.*(унитаз|туалет)|brush.*(toilet|wc))" : c.name==="Tozalash vositalari" ? "(tozal|щетк|губк|швабр)" : c.name==="Aksessuarlar" ? "(aksessuar|брелок|чехол)" : c.name==="Uy-ro‘zg‘or buyumlari" ? "(uy|дом|хранен)" : "";
   if(pattern) await sql`UPDATE products SET category_id=${c.id} WHERE category_id IS NULL AND name ~* ${pattern}`;
  }
  const bathroom=await sql`SELECT id FROM categories WHERE name = 'Unitaz vanna' LIMIT 1`;
- if(bathroom.length) await sql`UPDATE products SET category_id=${bathroom[0].id} WHERE name ~* '(ершик|ёршик|ершики|ёршики|yorshik|yorsh|ershik|ерш|вантуз|avntuz|vantuz|унитаз|unitaz|ванна|vanna)'`;
+ if(bathroom.length) await sql`UPDATE products SET category_id=${bathroom[0].id} WHERE name ~* '(ершик|ёршик|ершики|ёршики|yorshik|yorsh|ershik|ерш|вантуз|avntuz|vantuz|унитаз|unitaz|ванна|vanna|туалет|toilet|wc|щетк.*(унитаз|туалет)|brush.*(toilet|wc))'`;
  const hooks=await sql`SELECT id FROM categories WHERE name = 'Ilgak va osmalar' LIMIT 1`;
  if(hooks.length) await sql`UPDATE products SET category_id=${hooks[0].id} WHERE name ~* '(вешал|плечик|hanger|vishel|veshal|ilgich|kiyim ilgich|ilgak|крюч|креплен|липуч)'`;
  const other=await sql`SELECT id FROM categories WHERE name = 'Boshqa' LIMIT 1`;
