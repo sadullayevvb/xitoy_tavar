@@ -45,8 +45,30 @@ export default async function handler(req, res) {
       const name = String(req.body?.name || "").trim();
       const photoFileId = String(req.body?.photo_file_id || "").trim();
       const stockQty = Number(req.body?.stock_qty ?? 0);
-      const categoryId = req.body?.category_id == null || req.body?.category_id === '' ? null : Number(req.body.category_id);
+      let categoryId = req.body?.category_id == null || req.body?.category_id === '' ? null : Number(req.body.category_id);
       if (!name || !photoFileId) return res.status(400).json({ ok: false, error: "Nomi va rasm kerak" });
+      if (categoryId === null) {
+        const rules = [
+          ["Ilgak va osmalar", "(вешал|плечик|hanger|vishel|veshal|ilgich|kiyim ilgich|ilgak|крюч|креплен|липуч)"],
+          ["Unitaz vanna", "(ершик|ёршик|ершики|ёршики|yorshik|yorsh|ershik|ерш|вантуз|avntuz|vantuz|унитаз|unitaz|ванна|vanna|туалет|toilet|wc|щетк.*(унитаз|туалет)|brush.*(toilet|wc))"],
+          ["Korzinalar", "(korzina|корзин|basket)"],
+          ["Oshxona buyumlari", "(oshxona|кухн|кухон|нож|кухонн)"],
+          ["Tozalash vositalari", "(tozal|щетк|губк|швабр)"],
+          ["Aksessuarlar", "(aksessuar|брелок|чехол)"],
+          ["Uy-ro‘zg‘or buyumlari", "(uy|дом|хранен)"]
+        ];
+        for (const [categoryName, pattern] of rules) {
+          const matched = await sql`SELECT id FROM categories WHERE name = ${categoryName} LIMIT 1`;
+          if (matched.length) {
+            const found = await sql`SELECT ${name} ~* ${pattern} AS matched`;
+            if (found[0]?.matched) { categoryId = matched[0].id; break; }
+          }
+        }
+        if (categoryId === null) {
+          const other = await sql`SELECT id FROM categories WHERE name = 'Boshqa' LIMIT 1`;
+          if (other.length) categoryId = other[0].id;
+        }
+      }
       if (!Number.isSafeInteger(stockQty) || stockQty < 0) return res.status(400).json({ ok: false, error: "Qoldiq noto'g'ri" });
       const messageId = -Date.now();
       const rows = await sql`
