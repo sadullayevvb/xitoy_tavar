@@ -9,9 +9,12 @@ async function ensure(){
  for(const name of defaults) await sql`INSERT INTO categories(name) VALUES (${name}) ON CONFLICT (name) DO NOTHING`;
  const cats=await sql`SELECT id,name FROM categories WHERE name <> 'Boshqa'`;
  for(const c of cats){
-  let pattern = c.name==="Korzinalar" ? "(korzina|корзин|basket)" : c.name==="Oshxona buyumlari" ? "(oshxona|кухн|кухон|нож|кухонн)" : c.name==="Ilgak va osmalar" ? "(ilgak|крюч|креплен|липуч)" : c.name==="Tozalash vositalari" ? "(tozal|щетк|губк|швабр)" : c.name==="Aksessuarlar" ? "(aksessuar|брелок|чехол)" : c.name==="Uy-ro‘zg‘or buyumlari" ? "(uy|дом|хранен)" : "";
+  let pattern = c.name==="Korzinalar" ? "(korzina|корзин|basket)" : c.name==="Oshxona buyumlari" ? "(oshxona|кухн|кухон|нож|кухонн)" : c.name==="Ilgak va osmalar" ? "(вешал|плечик|hanger|vishel|veshal|ilgich|kiyim ilgich|ilgak|крюч|креплен|липуч)" : c.name==="Tozalash vositalari" ? "(tozal|щетк|губк|швабр)" : c.name==="Aksessuarlar" ? "(aksessuar|брелок|чехол)" : c.name==="Uy-ro‘zg‘or buyumlari" ? "(uy|дом|хранен)" : "";
   if(pattern) await sql`UPDATE products SET category_id=${c.id} WHERE category_id IS NULL AND name ~* ${pattern}`;
- } const other=await sql`SELECT id FROM categories WHERE name = 'Boshqa' LIMIT 1`;
+ }
+ const hooks=await sql`SELECT id FROM categories WHERE name = 'Ilgak va osmalar' LIMIT 1`;
+ if(hooks.length) await sql`UPDATE products SET category_id=${hooks[0].id} WHERE name ~* '(вешал|плечик|hanger|vishel|veshal|ilgich|kiyim ilgich|ilgak|крюч|креплен|липуч)'`;
+ const other=await sql`SELECT id FROM categories WHERE name = 'Boshqa' LIMIT 1`;
  if(other.length) await sql`UPDATE products SET category_id=${other[0].id} WHERE category_id IS NULL`;
 
 }
