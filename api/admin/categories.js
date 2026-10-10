@@ -19,6 +19,34 @@ async function ensure(){
  const other=await sql`SELECT id FROM categories WHERE name = 'Boshqa' LIMIT 1`;
  if(other.length) await sql`UPDATE products SET category_id=${other[0].id} WHERE category_id IS NULL`;
 
+ // Automatically create categories for repeated product types still in "Boshqa".
+ if(other.length){
+  const unclassified=await sql`SELECT id,name FROM products WHERE category_id=${other[0].id} AND is_deleted=FALSE ORDER BY id`;
+  const stop=new Set(["va","uchun","bilan","dan","ga","ni","the","and","with","for","set","набор","для","и","с","в","на","из","по","шт","шт.","новый","новая","новое","размер","цвет","модель","товар","hs"]);
+  const groups=new Map();
+  for(const p of unclassified){
+   const title=String(p.name||"").replace(/^\\s*(?:HS[-_ ]?)?\\d+[A-ZА-ЯЁ]?\\s*[-–—:]?\\s*/i,"").replace(/\\s+/g," ").trim();
+   const words=(title.match(/[A-Za-zА-Яа-яЁёЎўҚқҒғҲҳ]+/g)||[]).filter(w=>!stop.has(w.toLowerCase()));
+   if(!words.length) continue;
+   const key=words.slice(0,Math.min(2,words.length)).map(w=>w.toLowerCase()).join(" ");
+   if(!key || key.length<3) continue;
+   if(!groups.has(key)) groups.set(key,{name:words.slice(0,Math.min(2,words.length)).join(" "),ids:[]});
+   groups.get(key).ids.push(p.id);
+  }
+  for(const group of groups.values()){
+   if(group.ids.length<4) continue;
+   const existing=await sql`SELECT id FROM categories WHERE lower(name)=lower(${group.name}) LIMIT 1`;
+   let categoryId=existing.length?existing[0].id:null;
+   if(categoryId===null){
+    const created=await sql`INSERT INTO categories(name) VALUES (${group.name}) ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name RETURNING id`;
+    if(created.length) categoryId=created[0].id;
+   }
+   if(categoryId!==null){
+    for(const productId of group.ids) await sql`UPDATE products SET category_id=${categoryId} WHERE id=${productId} AND category_id=${other[0].id}`;
+   }
+  }
+ }
+
 }
 export default async function handler(req,res){
  headers(res);if(req.method==="OPTIONS")return res.status(204).end();if(!requireAdmin(req,res))return;
