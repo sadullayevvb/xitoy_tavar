@@ -25,7 +25,7 @@ async function ensure(){
   const stop=new Set(["va","uchun","bilan","dan","ga","ni","the","and","with","for","set","набор","для","и","с","в","на","из","по","шт","шт.","новый","новая","новое","размер","цвет","модель","товар","hs"]);
   const groups=new Map();
   for(const p of unclassified){
-   const title=String(p.name||"").replace(/^\\s*(?:HS[-_ ]?)?\\d+[A-ZА-ЯЁ]?\\s*[-–—:]?\\s*/i,"").replace(/\\s+/g," ").trim();
+   const title=String(p.name||"").replace(/^\s*(?:HS[-_ ]?)?\\d+[A-ZА-ЯЁ]?\s*[-–—:]?\s*/i,"").replace(/\s+/g," ").trim();
    const words=(title.match(/[A-Za-zА-Яа-яЁёЎўҚқҒғҲҳ]+/g)||[]).filter(w=>!stop.has(w.toLowerCase()));
    if(!words.length) continue;
    const key=words.slice(0,Math.min(2,words.length)).map(w=>w.toLowerCase()).join(" ");
