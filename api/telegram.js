@@ -52,7 +52,7 @@ export default async function handler(req, res) {
       }
 
       // Reply to /start in a private chat with the order link.
-      if (chat?.type === "private" && /^\\/start(?:@\\w+)?(?:\\s|$)/i.test(String(message.text || ""))) {
+      if (chat?.type === "private" && /^\/start(?:@\w+)?(?:\s|$)/i.test(String(message.text || ""))) {
         const token = process.env.BOT_TOKEN;
         if (!token) {
           console.error("BOT_TOKEN is not configured");
