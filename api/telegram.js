@@ -50,6 +50,33 @@ export default async function handler(req, res) {
         console.log("ORDER GROUP ID:", chat.id);
         return res.status(200).json({ ok: true, action: "group_saved", chat_id: chat.id });
       }
+
+      // Reply to /start in a private chat with the order link.
+      if (chat?.type === "private" && /^\\/start(?:@\\w+)?(?:\\s|$)/i.test(String(message.text || ""))) {
+        const token = process.env.BOT_TOKEN;
+        if (!token) {
+          console.error("BOT_TOKEN is not configured");
+          return res.status(500).json({ ok: false, error: "Bot token is not configured" });
+        }
+        const orderUrl = "https://xitoytavar.vercel.app";
+        const telegramResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chat.id,
+            text: "Assalomu alaykum! 🛍 Buyurtma berish uchun quyidagi tugmani bosing.",
+            reply_markup: {
+              inline_keyboard: [[{ text: "🛒 Zakaz qilish", url: orderUrl }]]
+            }
+          })
+        });
+        const telegramResult = await telegramResponse.json();
+        if (!telegramResponse.ok || !telegramResult.ok) {
+          console.error("TELEGRAM START REPLY ERROR:", telegramResult);
+          return res.status(502).json({ ok: false, error: "Could not send order link" });
+        }
+        return res.status(200).json({ ok: true, action: "start_order_link_sent" });
+      }
     }
 
     const post = update.channel_post || update.edited_channel_post;
