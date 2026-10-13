@@ -59,8 +59,6 @@ export default async function handler(req, res) {
       INSERT INTO user_profiles (telegram_id, first_name, last_name, username)
       VALUES (${String(user.id)}, ${String(user.first_name || "")}, ${String(user.last_name || "")}, ${String(user.username || "")})
       ON CONFLICT (telegram_id) DO UPDATE SET
-        first_name = CASE WHEN user_profiles.first_name = '' THEN EXCLUDED.first_name ELSE user_profiles.first_name END,
-        last_name = CASE WHEN user_profiles.last_name = '' THEN EXCLUDED.last_name ELSE user_profiles.last_name END,
         username = EXCLUDED.username,
         updated_at = CURRENT_TIMESTAMP
     `;
