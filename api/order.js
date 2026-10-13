@@ -44,6 +44,18 @@ export default async function handler(req, res) {
 
     const user = JSON.parse(params.get("user") || "{}");
     if (!user.id) return fail(res, 401, "Telegram foydalanuvchisi topilmadi");
+    await sql`CREATE TABLE IF NOT EXISTS user_profiles (
+      telegram_id BIGINT PRIMARY KEY,
+      phone TEXT NOT NULL DEFAULT '',
+      first_name TEXT NOT NULL DEFAULT '',
+      last_name TEXT NOT NULL DEFAULT '',
+      username TEXT NOT NULL DEFAULT '',
+      avatar_data TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`;
+    const profileRows = await sql`SELECT phone, first_name, last_name FROM user_profiles WHERE telegram_id = ${String(user.id)} LIMIT 1`;
+    const profile = profileRows[0] || {};
 
     if (!Array.isArray(items) || items.length === 0 || items.length > 100) return fail(res, 400, "Savat bo'sh");
     const quantities = new Map();
@@ -88,7 +100,8 @@ export default async function handler(req, res) {
     const message = [
       "🛒 YANGI ZAKAZ",
       "",
-      `👤 Mijoz: ${user.first_name || "Noma'lum"} ${user.last_name || ""}`,
+      `👤 Mijoz: ${profile.first_name || user.first_name || "Noma'lum"} ${profile.last_name || user.last_name || ""}`,
+      `📱 Telefon: ${profile.phone || "Profilga kiritilmagan"}`,
       `🔗 Username: ${user.username ? "@" + user.username : "Yo'q"}`,
       `🆔 Telegram ID: ${user.id}`,
       "",
