@@ -51,31 +51,99 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, action: "group_saved", chat_id: chat.id });
       }
 
-      // Reply to /start in a private chat with the order link.
-      if (chat?.type === "private" && /^\/start(?:@\w+)?(?:\s|$)/i.test(String(message.text || ""))) {
+      if (chat?.type === "private") {
         const token = process.env.BOT_TOKEN;
         if (!token) {
           console.error("BOT_TOKEN is not configured");
           return res.status(500).json({ ok: false, error: "Bot token is not configured" });
         }
-        const orderUrl = "https://xitoytavar.vercel.app";
-        const telegramResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chat.id,
-            text: "Assalomu alaykum! 🛍 Buyurtma berish uchun quyidagi tugmani bosing.",
-            reply_markup: {
-              inline_keyboard: [[{ text: "🛒 Zakaz qilish", url: orderUrl }]]
-            }
-          })
-        });
-        const telegramResult = await telegramResponse.json();
-        if (!telegramResponse.ok || !telegramResult.ok) {
-          console.error("TELEGRAM START REPLY ERROR:", telegramResult);
-          return res.status(502).json({ ok: false, error: "Could not send order link" });
+        await sql`CREATE TABLE IF NOT EXISTS user_profiles (
+          telegram_id BIGINT PRIMARY KEY,
+          phone TEXT NOT NULL DEFAULT '',
+          first_name TEXT NOT NULL DEFAULT '',
+          last_name TEXT NOT NULL DEFAULT '',
+          username TEXT NOT NULL DEFAULT '',
+          avatar_data TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`;
+        const sender = message.from;
+        const adminIds = String(process.env.ADMIN_TELEGRAM_IDS || "").split(",").map(v => v.trim()).filter(Boolean);
+        const isAdmin = !!sender?.id && adminIds.includes(String(sender.id));
+        const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+        const isStart = /^\/start(?:@\w+)?(?:\s|$)/i.test(String(message.text || ""));
+
+        if (message.contact) {
+          const contact = message.contact;
+          if (!sender?.id || !contact.user_id || String(contact.user_id) !== String(sender.id)) {
+            await fetch(apiUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: chat.id, text: "Iltimos, faqat o'zingizning telefon raqamingizni pastdagi tugma orqali yuboring.", reply_markup: { keyboard: [[{ text: "📱 Telefon raqamimni yuborish", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true } })
+            });
+            return res.status(200).json({ ok: true, action: "foreign_contact_rejected" });
+          }
+          await sql`
+            INSERT INTO user_profiles (telegram_id, phone, first_name, last_name, username)
+            VALUES (${String(sender.id)}, ${String(contact.phone_number || "")}, ${String(sender.first_name || "")}, ${String(sender.last_name || "")}, ${String(sender.username || "")})
+            ON CONFLICT (telegram_id) DO UPDATE SET
+              phone = EXCLUDED.phone,
+              first_name = CASE WHEN user_profiles.first_name = '' THEN EXCLUDED.first_name ELSE user_profiles.first_name END,
+              last_name = CASE WHEN user_profiles.last_name = '' THEN EXCLUDED.last_name ELSE user_profiles.last_name END,
+              username = EXCLUDED.username,
+              updated_at = CURRENT_TIMESTAMP
+          `;
+          const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chat.id,
+              text: "Rahmat! ✅ Telefon raqamingiz saqlandi. Buyurtma berish va profilingizni tahrirlash uchun tugmani bosing.",
+              reply_markup: {
+                remove_keyboard: true,
+                inline_keyboard: [[{ text: "🛒 Zakaz qilish", web_app: { url: "https://xitoytavar.vercel.app" } }]]
+              }
+            })
+          });
+          const result = await response.json();
+          if (!result.ok) {
+            console.error("TELEGRAM CONTACT REPLY ERROR:", result);
+            return res.status(502).json({ ok: false, error: "Could not send order link" });
+          }
+          return res.status(200).json({ ok: true, action: "phone_saved_and_order_link_sent" });
         }
-        return res.status(200).json({ ok: true, action: "start_order_link_sent" });
+
+        if (isStart) {
+          await sql`
+            INSERT INTO user_profiles (telegram_id, first_name, last_name, username)
+            VALUES (${String(sender.id)}, ${String(sender.first_name || "")}, ${String(sender.last_name || "")}, ${String(sender.username || "")})
+            ON CONFLICT (telegram_id) DO UPDATE SET
+              username = EXCLUDED.username,
+              updated_at = CURRENT_TIMESTAMP
+          `;
+          const payload = isAdmin
+            ? {
+                chat_id: chat.id,
+                text: "Assalomu alaykum, admin! 🛍 Buyurtma sahifasini ochish uchun tugmani bosing.",
+                reply_markup: { inline_keyboard: [[{ text: "🛒 Zakaz qilish", web_app: { url: "https://xitoytavar.vercel.app" } }]] }
+              }
+            : {
+                chat_id: chat.id,
+                text: "Assalomu alaykum! Buyurtma berishdan oldin telefon raqamingizni yuboring. Pastdagi tugmani bosing 👇",
+                reply_markup: { keyboard: [[{ text: "📱 Telefon raqamimni yuborish", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true }
+              };
+          const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const result = await response.json();
+          if (!result.ok) {
+            console.error("TELEGRAM START REPLY ERROR:", result);
+            return res.status(502).json({ ok: false, error: "Could not send start reply" });
+          }
+          return res.status(200).json({ ok: true, action: isAdmin ? "admin_start_link_sent" : "phone_requested" });
+        }
       }
     }
 
