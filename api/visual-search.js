@@ -70,8 +70,15 @@ export default async function handler(req, res) {
     });
     const result = await response.json();
     if (!response.ok) {
-      console.error("VISUAL SEARCH AI ERROR:", result?.error?.message || response.status);
-      return fail(res, 502, "AI qidiruv vaqtincha ishlamadi. Keyinroq qayta urinib ko‘ring.");
+      const aiMessage = String(result?.error?.message || "");
+      const aiCode = String(result?.error?.code || result?.error?.type || "");
+      console.error("VISUAL SEARCH AI ERROR:", response.status, aiCode, aiMessage);
+      if (response.status === 401) return fail(res, 502, "OpenAI API kaliti noto‘g‘ri yoki bekor qilingan. Vercel’dagi OPENAI_API_KEY ni tekshiring.");
+      if (response.status === 429 && /quota|billing|credit|usage limit/i.test(aiMessage + " " + aiCode)) return fail(res, 502, "OpenAI API hisobida mablag‘ yoki billing limiti muammosi bor. OpenAI Platform → Billing bo‘limini tekshiring.");
+      if (response.status === 429) return fail(res, 502, "OpenAI so‘rovlari limiti vaqtincha oshdi. Biroz kutib qayta urinib ko‘ring.");
+      if (response.status === 403) return fail(res, 502, "OpenAI loyihasida modeldan foydalanish ruxsati yo‘q. API loyiha va billing sozlamalarini tekshiring.");
+      if (response.status === 400) return fail(res, 502, "OpenAI rasm so‘rovini qabul qilmadi. Boshqa JPG yoki PNG rasm tanlab ko‘ring.");
+      return fail(res, 502, "OpenAI xizmati xato qaytardi (" + response.status + "). Vercel Logs orqali sababini tekshirish kerak.");
     }
     const text = result.output_text || (result.output || []).flatMap(item => item.content || []).filter(item => item.type === "output_text").map(item => item.text).join("\n");
     let parsed;
