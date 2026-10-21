@@ -26,6 +26,49 @@ async function ensureColumns() {
 
 const returning = sql`id, channel_id, message_id, name, photo_file_id, stock_qty, price, is_deleted, admin_edited, created_at, updated_at, deleted_at`;
 
+function getArticle(name) {
+  const match = String(name || "").match(/(?:^|[^A-Z0-9])((?:HS-?\\d{1,4}|\\d{4,6}-\\d+|TJ\\d{4}|L\\d{4}|ГТД-\\d+))(?:\\b|[.])/i);
+  return match ? match[1].toUpperCase().replace(/^HS(?=\\d)/, "HS-") : "";
+}
+
+async function publishPhotoIfMissing(product) {
+  const article = getArticle(product?.name);
+  if (!product?.photo_file_id || !article) return { published: false, reason: "article_or_photo_missing" };
+  const token = process.env.BOT_TOKEN;
+  if (!token) return { published: false, reason: "BOT_TOKEN_missing" };
+
+  await sql`CREATE TABLE IF NOT EXISTS azikom_channel_publications (
+    article TEXT PRIMARY KEY,
+    product_id INTEGER NOT NULL,
+    channel_id TEXT NOT NULL,
+    message_id BIGINT,
+    published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`;
+
+  const tracked = await sql`SELECT article FROM azikom_channel_publications WHERE article = ${article} LIMIT 1`;
+  if (tracked.length) return { published: false, reason: "already_published" };
+
+  const channelRows = await sql`SELECT name FROM products WHERE channel_id <> 'admin' AND is_deleted = FALSE`;
+  const alreadyInChannel = channelRows.some(row => getArticle(row.name) === article);
+  if (alreadyInChannel) {
+    await sql`INSERT INTO azikom_channel_publications(article, product_id, channel_id) VALUES (${article}, ${product.id}, '@azikom_zakaz') ON CONFLICT (article) DO NOTHING`;
+    return { published: false, reason: "already_in_channel" };
+  }
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: "@azikom_zakaz", photo: product.photo_file_id })
+  });
+  const result = await response.json();
+  if (!result.ok) {
+    console.error("AZIKOM CHANNEL PHOTO ERROR:", result);
+    return { published: false, reason: result.description || "telegram_send_failed" };
+  }
+  await sql`INSERT INTO azikom_channel_publications(article, product_id, channel_id, message_id) VALUES (${article}, ${product.id}, '@azikom_zakaz', ${result.result?.message_id || null}) ON CONFLICT (article) DO NOTHING`;
+  return { published: true, article };
+}
+
 export default async function handler(req, res) {
   cors(res);
   if (req.method === "OPTIONS") return res.status(204).end();
@@ -88,9 +131,12 @@ export default async function handler(req, res) {
       const rows = await sql`
         INSERT INTO products (channel_id, message_id, name, photo_file_id, stock_qty, price, category_id, is_deleted, admin_edited, updated_at)
         VALUES ('admin', ${messageId}, ${name}, ${photoFileId}, ${stockQty}, ${Number(req.body?.price ?? 0)}, ${categoryId}, FALSE, TRUE, CURRENT_TIMESTAMP)
-        RETURNING id, channel_id, message_id, name, photo_file_id, stock_qty, is_deleted, admin_edited, created_at, updated_at, deleted_at
+        RETURNING id, channel_id, message_id, name, photo_file_id, stock_qty, price, is_deleted, admin_edited, created_at, updated_at, deleted_at
       `;
-      return res.status(201).json({ ok: true, product: rows[0] });
+      let channelPublication = { published: false, reason: "not_attempted" };
+      try { channelPublication = await publishPhotoIfMissing(rows[0]); }
+      catch (publishError) { console.error("AZIKOM CHANNEL PUBLISH ERROR:", publishError); channelPublication = { published: false, reason: "publish_error" }; }
+      return res.status(201).json({ ok: true, product: rows[0], channel_publication: channelPublication });
     }
 
     if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ ok: false, error: "Mahsulot ID noto'g'ri" });
@@ -123,9 +169,14 @@ export default async function handler(req, res) {
       const rows = await sql`
         UPDATE products SET name = ${name}, photo_file_id = ${photoFileId}, stock_qty = ${stockQty}, price = ${Number(req.body?.price ?? current[0].price ?? 0)}, category_id = ${categoryId}, admin_edited = TRUE, updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
-        RETURNING id, channel_id, message_id, name, photo_file_id, stock_qty, is_deleted, admin_edited, created_at, updated_at, deleted_at
+        RETURNING id, channel_id, message_id, name, photo_file_id, stock_qty, price, is_deleted, admin_edited, created_at, updated_at, deleted_at
       `;
-      return res.status(200).json({ ok: true, product: rows[0] });
+      let channelPublication = { published: false, reason: "not_attempted" };
+      if (!current[0].photo_file_id && rows[0].photo_file_id) {
+        try { channelPublication = await publishPhotoIfMissing(rows[0]); }
+        catch (publishError) { console.error("AZIKOM CHANNEL PUBLISH ERROR:", publishError); channelPublication = { published: false, reason: "publish_error" }; }
+      }
+      return res.status(200).json({ ok: true, product: rows[0], channel_publication: channelPublication });
     }
 
     if (req.method === "DELETE") {
