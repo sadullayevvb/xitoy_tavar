@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       const trash = String(req.query?.trash || "0") === "1";
       const rows = trash
         ? await sql`SELECT p.id, p.channel_id, p.message_id, p.name, p.photo_file_id, p.stock_qty, p.price, p.category_id, c.name AS category_name, p.is_deleted, p.admin_edited, p.created_at, p.updated_at, p.deleted_at FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_deleted = TRUE ORDER BY p.id DESC`
-        : await sql`SELECT p.id, p.channel_id, p.message_id, p.name, p.photo_file_id, p.stock_qty, p.category_id, c.name AS category_name, p.is_deleted, p.admin_edited, p.created_at, p.updated_at, p.deleted_at FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_deleted = FALSE ORDER BY p.id DESC`;
+        : await sql`SELECT p.id, p.channel_id, p.message_id, p.name, p.photo_file_id, p.stock_qty, p.price, p.category_id, c.name AS category_name, p.is_deleted, p.admin_edited, p.created_at, p.updated_at, p.deleted_at FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_deleted = FALSE ORDER BY p.id DESC`;
       return res.status(200).json({ ok: true, products: rows });
     }
 
