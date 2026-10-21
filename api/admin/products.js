@@ -27,7 +27,7 @@ async function ensureColumns() {
 const returning = sql`id, channel_id, message_id, name, photo_file_id, stock_qty, price, is_deleted, admin_edited, created_at, updated_at, deleted_at`;
 
 function getArticle(name) {
-  const match = String(name || "").match(/(?:^|[^A-Z0-9])((?:HS-?\\d{1,4}|\\d{4,6}-\\d+|TJ\\d{4}|L\\d{4}|ГТД-\\d+))(?:\\b|[.])/i);
+  const match = String(name || "").match(/(?:^|[^A-Z0-9])((?:HS-?\d{1,4}|\d{4,6}-\d+|TJ\d{4}|L\d{4}|ГТД-\d+))(?:\b|[.])/i);
   return match ? match[1].toUpperCase().replace(/^HS(?=\\d)/, "HS-") : "";
 }
 
@@ -61,7 +61,7 @@ async function publishPhotoIfMissing(product) {
     body: JSON.stringify({
       chat_id: "@azikom_zakaz",
       photo: product.photo_file_id,
-      caption: `${product.name}\\nArtikul: ${article}`
+      caption: `${product.name}\nArtikul: ${article}`
     })
   });
   const result = await response.json();
