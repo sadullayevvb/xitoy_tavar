@@ -41,6 +41,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, enabled });
     }
 
+    if (req.method === "GET" && String(req.query?.settings || "") === "1") {
+      await sql`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
+      const settings = await sql`SELECT value FROM app_settings WHERE key = 'hide_products_without_photo' LIMIT 1`;
+      return res.status(200).json({ ok: true, hide_no_photo: settings[0]?.value === "true" });
+    }
+
     if (req.method === "GET") {
       const trash = String(req.query?.trash || "0") === "1";
       const rows = trash
