@@ -25,10 +25,18 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     await ensureCatalogColumns();
-    const products = await sql`
-      SELECT p.id, p.name, p.photo_file_id, p.stock_qty, p.price, p.category_id, c.name AS category_name, p.created_at, p.updated_at
-      FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_deleted = FALSE ORDER BY p.id DESC
-    `;
+    await sql`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
+    const settings = await sql`SELECT value FROM app_settings WHERE key = 'hide_products_without_photo' LIMIT 1`;
+    const hideNoPhoto = settings[0]?.value === "true";
+    const products = hideNoPhoto
+      ? await sql`
+          SELECT p.id, p.name, p.photo_file_id, p.stock_qty, p.price, p.category_id, c.name AS category_name, p.created_at, p.updated_at
+          FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_deleted = FALSE AND p.photo_file_id IS NOT NULL AND p.photo_file_id <> '' ORDER BY p.id DESC
+        `
+      : await sql`
+          SELECT p.id, p.name, p.photo_file_id, p.stock_qty, p.price, p.category_id, c.name AS category_name, p.created_at, p.updated_at
+          FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_deleted = FALSE ORDER BY p.id DESC
+        `;
     res.setHeader("Cache-Control", "no-store, max-age=0");
     return res.status(200).json({ ok: true, products });
   } catch (error) {
