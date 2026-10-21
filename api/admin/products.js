@@ -58,7 +58,11 @@ async function publishPhotoIfMissing(product) {
   const response = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: "@azikom_zakaz", photo: product.photo_file_id })
+    body: JSON.stringify({
+      chat_id: "@azikom_zakaz",
+      photo: product.photo_file_id,
+      caption: `${product.name}\\nArtikul: ${article}`
+    })
   });
   const result = await response.json();
   if (!result.ok) {
