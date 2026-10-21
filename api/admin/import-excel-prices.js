@@ -229,7 +229,7 @@ export default async function handler(req, res) {
     const missing = [];
     const matchedCodes = new Set();
     for (const product of products) {
-      const match = String(product.name || "").toUpperCase().match(/(^|[^A-Z0-9])((?:HS-\d+)|(?:13964-\d+)|(?:10873-\d+)|(?:L\d{4})|(?:TJ\d{4}))(?=$|[^A-Z0-9])/);
+      const match = String(product.name || "").toUpperCase().match(/(^|[^A-Z0-9])((?:HS-\d+)|(?:ГТД-\d+)|(?:13964-\d+)|(?:10873-\d+)|(?:L\d{4})|(?:TJ\d{4}))(?=$|[^A-Z0-9])/);
       if (!match) continue;
       const code = match[2];
       if (!Object.prototype.hasOwnProperty.call(PRICES, code)) continue;
