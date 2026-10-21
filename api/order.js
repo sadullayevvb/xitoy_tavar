@@ -76,7 +76,7 @@ export default async function handler(req, res) {
     inTransaction = true;
 
     const { rows: products } = await client.query(
-      `SELECT id, name, stock_qty, is_deleted FROM products WHERE id = ANY($1::int[]) FOR UPDATE`,
+      `SELECT id, name, stock_qty, price, is_deleted FROM products WHERE id = ANY($1::int[]) FOR UPDATE`,
       [ids]
     );
 
@@ -96,7 +96,8 @@ export default async function handler(req, res) {
     }
 
     const total = [...quantities.values()].reduce((sum, qty) => sum + qty, 0);
-    const lines = products.map((product, index) => `${index + 1}. ${product.name} — ${quantities.get(Number(product.id))} dona`);
+    const totalPrice = products.reduce((sum, product) => sum + Number(product.price || 0) * quantities.get(Number(product.id)), 0);
+    const lines = products.map((product, index) => `${index + 1}. ${product.name} — ${quantities.get(Number(product.id))} dona × ${Number(product.price || 0).toFixed(2)} = ${(Number(product.price || 0) * quantities.get(Number(product.id))).toFixed(2)}`);
     const message = [
       "🛒 YANGI ZAKAZ",
       "",
@@ -108,7 +109,8 @@ export default async function handler(req, res) {
       "📦 Mahsulotlar:",
       ...lines,
       "",
-      `📊 Jami: ${total} dona`
+      `📊 Jami: ${total} dona`,
+      `💵 Umumiy summa: ${totalPrice.toFixed(2)}`
     ].join("\n");
 
     const telegramResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
