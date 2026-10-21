@@ -1,0 +1,271 @@
+import { neon } from "@neondatabase/serverless";
+import { requireAdmin } from "../../lib/adminAuth.js";
+
+const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+const sql = neon(DATABASE_URL);
+const PRICES = Object.fromEntries(Object.entries({
+  "HS-1": 3.6,
+  "HS-3": 4,
+  "HS-4": 2.5,
+  "HS-5": 2.1,
+  "HS-6": 2.6,
+  "HS-8": 3.7,
+  "HS-9": 3,
+  "HS-10": 2.1,
+  "HS-11": 2.3,
+  "HS-12": 2.6,
+  "HS-13": 3,
+  "HS-14": 0.8,
+  "HS-15": 3.9,
+  "HS-16": 3.9,
+  "HS-18": 2.6,
+  "HS-19": 2.4,
+  "HS-20": 2.2,
+  "HS-21": 5.7,
+  "HS-22": 1,
+  "HS-24": 1.6,
+  "HS-25": 1.3,
+  "HS-26": 1.8,
+  "HS-27": 1.6,
+  "HS-28": 0.6,
+  "HS-29": 0.7,
+  "HS-30": 2.8,
+  "HS-31": 2.8,
+  "HS-32": 2.4,
+  "HS-37": 0.7,
+  "HS-40": 0.6,
+  "HS-42": 1,
+  "HS-43": 0.7,
+  "HS-45": 1.5,
+  "HS-46": 3.3,
+  "HS-47": 2.9,
+  "HS-48": 2.1,
+  "HS-49": 2.2,
+  "HS-50": 3.7,
+  "HS-51": 2.9,
+  "HS-54": 2,
+  "HS-55": 3.4,
+  "HS-56": 3.5,
+  "HS-57": 2.9,
+  "HS-58": 3.4,
+  "HS-59": 4.2,
+  "HS-60": 4.2,
+  "HS-61": 2.9,
+  "HS-62": 5.2,
+  "HS-63": 3.4,
+  "HS-64": 2.6,
+  "HS-65": 1.6,
+  "HS-66": 2,
+  "HS-67": 1.4,
+  "HS-68": 1.5,
+  "HS-69": 1.7,
+  "HS-70": 2.2,
+  "HS-72": 2.2,
+  "HS-73": 2.2,
+  "HS-74": 3,
+  "HS-75": 12,
+  "HS-76": 9,
+  "HS-77": 9,
+  "HS-78": 1.7,
+  "HS-79": 2.3,
+  "HS-80": 1.6,
+  "HS-81": 1.7,
+  "HS-82": 1.7,
+  "HS-83": 2.2,
+  "HS-84": 1.8,
+  "HS-85": 1.7,
+  "HS-86": 1.7,
+  "HS-87": 1.7,
+  "HS-88": 1.7,
+  "HS-89": 1.7,
+  "HS-90": 1.7,
+  "HS-91": 1.7,
+  "HS-92": 1.8,
+  "HS-93": 1.8,
+  "HS-94": 1.7,
+  "HS-95": 2.5,
+  "HS-96": 1.8,
+  "HS-97": 1.5,
+  "HS-98": 1.2,
+  "HS-99": 2.8,
+  "HS-100": 2.2,
+  "HS-101": 1.6,
+  "HS-102": 1.2,
+  "HS-103": 2.2,
+  "HS-104": 1.6,
+  "HS-105": 2.7,
+  "HS-106": 3.8,
+  "HS-107": 0.7,
+  "HS-108": 0.8,
+  "HS-109": 1,
+  "HS-131": 7,
+  "HS-132": 7,
+  "HS-133": 7,
+  "HS-134": 7,
+  "HS-135": 7,
+  "HS-136": 7,
+  "HS-137": 7,
+  "HS-180": 25,
+  "HS-181": 30,
+  "HS-183": 4.9,
+  "HS-184": 5,
+  "HS-185": 7,
+  "HS-186": 6.7,
+  "HS-187": 6.7,
+  "HS-188": 5.1,
+  "HS-189": 3.2,
+  "HS-190": 5,
+  "HS-191": 5,
+  "HS-193": 3,
+  "HS-194": 3,
+  "HS-195": 3,
+  "HS-198": 1.1,
+  "HS-199": 1.7,
+  "HS-204": 0.6,
+  "HS-205": 0.6,
+  "HS-206": 1,
+  "HS-209": 2.7,
+  "HS-210": 5.3,
+  "HS-212": 6.5,
+  "HS-213": 2.8,
+  "HS-214": 3.2,
+  "HS-215": 3.6,
+  "HS-216": 4.2,
+  "HS-23": 1.2,
+  "HS-52": 3.3,
+  "HS-53": 3.2,
+  "HS-196": 3,
+  "HS-197": 2,
+  "HS-200": 1,
+  "HS-201": 1.1,
+  "HS-202": 1.3,
+  "HS-203": 0.4,
+  "HS-207": 3.3,
+  "HS-208": 3,
+  "HS-211": 17,
+  "HS-151": 0.8,
+  "HS-152": 1,
+  "HS-154": 2.2,
+  "HS-155": 1,
+  "HS-156": 2.2,
+  "HS-157": 2.9,
+  "HS-158": 3.4,
+  "HS-159": 2.2,
+  "HS-160": 2.2,
+  "HS-161": 1.8,
+  "HS-162": 1.5,
+  "HS-163": 2.2,
+  "HS-164": 2.7,
+  "HS-165": 2.2,
+  "HS-166": 2.9,
+  "HS-168": 2.4,
+  "HS-169": 2.6,
+  "HS-170": 2.2,
+  "HS-171": 2.9,
+  "HS-172": 2.2,
+  "HS-175": 2.2,
+  "10873-1": 10,
+  "10873-2": 19,
+  "10873-3": 14,
+  "10873-4": 10,
+  "10873-5": 18,
+  "10873-6": 18,
+  "10873-7": 20,
+  "10873-8": 10,
+  "ГТД-37": 18,
+  "13964-1": 18,
+  "13964-2": 11.5,
+  "13964-3": 18,
+  "13964-4": 4.6,
+  "13964-5": 13.5,
+  "TJ0102": 22,
+  "TJ0103": 30,
+  "TJ0104": 34,
+  "TJ0105": 42,
+  "L0103": 50,
+  "L0104": 58,
+  "HS-250": 11,
+  "HS-251": 5,
+  "HS-252": 4.7,
+  "HS-253": 4.4,
+  "HS-254": 6.1,
+  "HS-255": 4.4,
+  "HS-256": 6.1,
+  "HS-257": 8.2,
+  "HS-258": 8,
+  "HS-259": 6.1,
+  "HS-260": 4.3,
+  "HS-261": 6.3,
+  "HS-262": 5.5,
+  "HS-263": 4,
+  "HS-264": 2.9,
+  "HS-265": 3.8,
+  "HS-266": 9.5,
+  "HS-267": 2,
+  "HS-268": 2.3,
+  "HS-269": 2.8,
+  "HS-270": 5.5,
+  "HS-271": 2.5,
+  "HS-272": 2.7,
+  "HS-273": 2.8,
+  "HS-274": 5,
+  "HS-217": 5,
+  "HS-218": 6,
+  "HS-219": 7
+}).map(([code, price]) => [code.toUpperCase(), price]));
+
+function normalizeCode(value) {
+  return String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+}
+function extractCode(name) {
+  const m = String(name || "").toUpperCase().match(/(^|[^A-Z0-9])((?:HS-\d+)|(?:ГТД-\d+)|(?:13964-\d+)|(?:10873-\d+)|(?:L\d{4})|(?:TJ\d{4}))(?=$|[^A-Z0-9])/);
+  return m ? normalizeCode(m[2]) : null;
+}
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
+  if (!requireAdmin(req, res)) return;
+  try {
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS price NUMERIC(12,2) NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_qty INTEGER NOT NULL DEFAULT 0`;
+    // New catalog items are allowed to have no photo until the admin adds one.
+    await sql`ALTER TABLE products ALTER COLUMN photo_file_id DROP NOT NULL`;
+    const input = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (!input.length || input.length > 1000) return res.status(400).json({ ok:false, error:"Excel qatorlari topilmadi yoki soni noto‘g‘ri" });
+    const items = input.map(x => ({
+      name: String(x.name || "").trim(),
+      code: normalizeCode(x.code),
+      stock: Number(x.stock)
+    })).filter(x => x.name && x.code && Number.isSafeInteger(x.stock) && x.stock >= 0);
+    const catalog = await sql`SELECT id, name FROM products WHERE is_deleted = FALSE`;
+    const catalogCodes = new Set(catalog.map(p => extractCode(p.name)).filter(Boolean));
+    const existing = [];
+    const created = [];
+    const noPrice = [];
+    const seen = new Set();
+    for (const item of items) {
+      if (seen.has(item.code)) continue;
+      seen.add(item.code);
+      if (catalogCodes.has(item.code)) { existing.push(item.code); continue; }
+      const price = Object.prototype.hasOwnProperty.call(PRICES, item.code) ? PRICES[item.code] : 0;
+      if (!Object.prototype.hasOwnProperty.call(PRICES, item.code)) noPrice.push(item.code);
+      const fullName = item.code + ". " + item.name;
+      const messageId = -Date.now() - created.length;
+      const result = await sql`
+        INSERT INTO products (channel_id, message_id, name, photo_file_id, stock_qty, price, is_deleted, admin_edited, updated_at)
+        VALUES ('excel-import', ${messageId}, ${fullName}, NULL, ${item.stock}, ${price}, FALSE, TRUE, CURRENT_TIMESTAMP)
+        RETURNING id, name, stock_qty, price
+      `;
+      created.push(result[0]);
+      catalogCodes.add(item.code);
+    }
+    return res.status(200).json({ok:true, excel_count:items.length, existing_count:existing.length, created_count:created.length, existing_codes:existing, no_price_codes:noPrice, created});
+  } catch (error) {
+    console.error("EXCEL CATALOG RECONCILE ERROR:", error);
+    return res.status(500).json({ok:false,error:"Excel katalogini solishtirishda xatolik"});
+  }
+}
