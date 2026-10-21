@@ -34,6 +34,13 @@ export default async function handler(req, res) {
     await ensureColumns();
     const id = Number(req.query?.id || req.body?.id || 0);
 
+    if (req.method === "PATCH" && String(req.body?.action || "") === "set_hide_no_photo") {
+      await sql`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
+      const enabled = req.body?.enabled === true;
+      await sql`INSERT INTO app_settings(key, value, updated_at) VALUES ('hide_products_without_photo', ${enabled ? "true" : "false"}, CURRENT_TIMESTAMP) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`;
+      return res.status(200).json({ ok: true, enabled });
+    }
+
     if (req.method === "GET") {
       const trash = String(req.query?.trash || "0") === "1";
       const rows = trash
