@@ -73,8 +73,8 @@ export default async function handler(req, res) {
       if (!Number.isSafeInteger(stockQty) || stockQty < 0) return res.status(400).json({ ok: false, error: "Qoldiq noto'g'ri" });
       const messageId = -Date.now();
       const rows = await sql`
-        INSERT INTO products (channel_id, message_id, name, photo_file_id, stock_qty, category_id, is_deleted, admin_edited, updated_at)
-        VALUES ('admin', ${messageId}, ${name}, ${photoFileId}, ${stockQty}, ${categoryId}, FALSE, TRUE, CURRENT_TIMESTAMP)
+        INSERT INTO products (channel_id, message_id, name, photo_file_id, stock_qty, price, category_id, is_deleted, admin_edited, updated_at)
+        VALUES ('admin', ${messageId}, ${name}, ${photoFileId}, ${stockQty}, ${Number(req.body?.price ?? 0)}, ${categoryId}, FALSE, TRUE, CURRENT_TIMESTAMP)
         RETURNING id, channel_id, message_id, name, photo_file_id, stock_qty, is_deleted, admin_edited, created_at, updated_at, deleted_at
       `;
       return res.status(201).json({ ok: true, product: rows[0] });
@@ -93,7 +93,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, product: rows[0] });
       }
 
-      const current = await sql`SELECT id, name, photo_file_id, stock_qty, category_id FROM products WHERE id = ${id} LIMIT 1`;
+      const current = await sql`SELECT id, name, photo_file_id, stock_qty, price, category_id FROM products WHERE id = ${id} LIMIT 1`;
       if (!current.length) return res.status(404).json({ ok: false, error: "Mahsulot topilmadi" });
       const name = String(req.body?.name ?? current[0].name).trim();
       const photoFileId = String(req.body?.photo_file_id ?? current[0].photo_file_id).trim();
@@ -102,7 +102,7 @@ export default async function handler(req, res) {
       if (!name || !photoFileId) return res.status(400).json({ ok: false, error: "Nomi va rasm kerak" });
       if (!Number.isSafeInteger(stockQty) || stockQty < 0) return res.status(400).json({ ok: false, error: "Qoldiq noto'g'ri" });
       const rows = await sql`
-        UPDATE products SET name = ${name}, photo_file_id = ${photoFileId}, stock_qty = ${stockQty}, category_id = ${categoryId}, admin_edited = TRUE, updated_at = CURRENT_TIMESTAMP
+        UPDATE products SET name = ${name}, photo_file_id = ${photoFileId}, stock_qty = ${stockQty}, price = ${Number(req.body?.price ?? current[0].price ?? 0)}, category_id = ${categoryId}, admin_edited = TRUE, updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING id, channel_id, message_id, name, photo_file_id, stock_qty, is_deleted, admin_edited, created_at, updated_at, deleted_at
       `;
