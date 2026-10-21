@@ -1,6 +1,7 @@
 import { requireAdmin } from "../../lib/adminAuth.js";
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
+const PHOTO_STORAGE_CHAT_ID = process.env.PHOTO_STORAGE_CHAT_ID;
 
 function cors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -19,12 +20,13 @@ export default async function handler(req, res) {
 
   try {
     if (!BOT_TOKEN) return res.status(500).json({ ok: false, error: "BOT_TOKEN sozlanmagan" });
+    if (!PHOTO_STORAGE_CHAT_ID) return res.status(500).json({ ok: false, error: "Vercel Environment Variables bo‘limida PHOTO_STORAGE_CHAT_ID sozlang. Bot uchun yopiq rasm-saqlash guruhini yarating." });
 
-    const chatId = String(req.body?.chat_id || "").trim();
+    const chatId = String(PHOTO_STORAGE_CHAT_ID).trim();
     const image = String(req.body?.image || "").trim();
 
     if (!chatId || !image) {
-      return res.status(400).json({ ok: false, error: "Rasm va Telegram chat ID kerak" });
+      return res.status(400).json({ ok: false, error: "Rasm kerak" });
     }
 
     const match = image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/s);
