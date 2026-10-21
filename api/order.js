@@ -25,8 +25,15 @@ export default async function handler(req, res) {
   let inTransaction = false;
 
   try {
-    const { items, initData } = req.body || {};
+    const { items, initData, customer } = req.body || {};
     if (!BOT_TOKEN || !initData) return fail(res, 401, "Telegram orqali kiring");
+    const customerInfo = {
+      name: String(customer?.name || "").trim().slice(0, 120),
+      shop: String(customer?.shop || "").trim().slice(0, 120),
+      address: String(customer?.address || "").trim().slice(0, 300),
+      phone: String(customer?.phone || "").trim().slice(0, 30)
+    };
+    if (!customerInfo.name || !customerInfo.shop || !customerInfo.address || !customerInfo.phone) return fail(res, 400, "Ism, do‘kon nomi, manzil va telefonni to‘ldiring");
 
     const { createHmac, timingSafeEqual } = await import("node:crypto");
     const params = new URLSearchParams(initData);
@@ -97,20 +104,22 @@ export default async function handler(req, res) {
 
     const total = [...quantities.values()].reduce((sum, qty) => sum + qty, 0);
     const totalPrice = products.reduce((sum, product) => sum + Number(product.price || 0) * quantities.get(Number(product.id)), 0);
-    const lines = products.map((product, index) => `${index + 1}. ${product.name} — ${quantities.get(Number(product.id))} dona × ${Number(product.price || 0).toFixed(2)} = ${(Number(product.price || 0) * quantities.get(Number(product.id))).toFixed(2)}`);
+    const lines = products.map((product, index) => `${index + 1}. ${product.name} — ${quantities.get(Number(product.id))} dona × $${Number(product.price || 0).toFixed(2)} = $${(Number(product.price || 0) * quantities.get(Number(product.id))).toFixed(2)}`);
     const message = [
       "🛒 YANGI ZAKAZ",
       "",
-      `👤 Mijoz: ${profile.first_name || user.first_name || "Noma'lum"} ${profile.last_name || user.last_name || ""}`,
-      `📱 Telefon: ${profile.phone || "Profilga kiritilmagan"}`,
-      `🔗 Username: ${user.username ? "@" + user.username : "Yo'q"}`,
+      `👤 Mijoz: ${customerInfo.name}`,
+      `🏪 Do‘kon: ${customerInfo.shop}`,
+      `📍 Manzil: ${customerInfo.address}`,
+      `📱 Telefon: ${customerInfo.phone}`,
+      `🔗 Username: ${user.username ? "@" + user.username : "Yo‘q"}`,
       `🆔 Telegram ID: ${user.id}`,
       "",
       "📦 Mahsulotlar:",
       ...lines,
       "",
       `📊 Jami: ${total} dona`,
-      `💵 Umumiy summa: ${totalPrice.toFixed(2)}`
+      `💵 Umumiy summa: $${totalPrice.toFixed(2)}`
     ].join("\n");
 
     const telegramResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
