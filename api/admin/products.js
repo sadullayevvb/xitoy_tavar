@@ -83,6 +83,12 @@ export default async function handler(req, res) {
     if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ ok: false, error: "Mahsulot ID noto'g'ri" });
 
     if (req.method === "PATCH") {
+      if (String(req.body?.action || "") === "remove_photo") {
+        await sql`ALTER TABLE products ALTER COLUMN photo_file_id DROP NOT NULL`;
+        const rows = await sql`UPDATE products SET photo_file_id = NULL, admin_edited = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ${id} RETURNING id, name, photo_file_id`;
+        if (!rows.length) return res.status(404).json({ ok: false, error: "Mahsulot topilmadi" });
+        return res.status(200).json({ ok: true, product: rows[0] });
+      }
       if (String(req.body?.action || "") === "restore") {
         const rows = await sql`
           UPDATE products SET is_deleted = FALSE, deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
