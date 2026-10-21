@@ -21,9 +21,10 @@ async function ensureColumns() {
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_qty INTEGER NOT NULL DEFAULT 0`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS price NUMERIC(12,2) NOT NULL DEFAULT 0`;
 }
 
-const returning = sql`id, channel_id, message_id, name, photo_file_id, stock_qty, is_deleted, admin_edited, created_at, updated_at, deleted_at`;
+const returning = sql`id, channel_id, message_id, name, photo_file_id, stock_qty, price, is_deleted, admin_edited, created_at, updated_at, deleted_at`;
 
 export default async function handler(req, res) {
   cors(res);
@@ -36,7 +37,7 @@ export default async function handler(req, res) {
     if (req.method === "GET") {
       const trash = String(req.query?.trash || "0") === "1";
       const rows = trash
-        ? await sql`SELECT p.id, p.channel_id, p.message_id, p.name, p.photo_file_id, p.stock_qty, p.category_id, c.name AS category_name, p.is_deleted, p.admin_edited, p.created_at, p.updated_at, p.deleted_at FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_deleted = TRUE ORDER BY p.id DESC`
+        ? await sql`SELECT p.id, p.channel_id, p.message_id, p.name, p.photo_file_id, p.stock_qty, p.price, p.category_id, c.name AS category_name, p.is_deleted, p.admin_edited, p.created_at, p.updated_at, p.deleted_at FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_deleted = TRUE ORDER BY p.id DESC`
         : await sql`SELECT p.id, p.channel_id, p.message_id, p.name, p.photo_file_id, p.stock_qty, p.category_id, c.name AS category_name, p.is_deleted, p.admin_edited, p.created_at, p.updated_at, p.deleted_at FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_deleted = FALSE ORDER BY p.id DESC`;
       return res.status(200).json({ ok: true, products: rows });
     }
