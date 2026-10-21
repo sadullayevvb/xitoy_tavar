@@ -13,6 +13,7 @@ async function ensureCatalogColumns() {
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_qty INTEGER NOT NULL DEFAULT 0`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS price NUMERIC(12,2) NOT NULL DEFAULT 0`;
   await sql`UPDATE products SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL`;
 }
 
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
   try {
     await ensureCatalogColumns();
     const products = await sql`
-      SELECT p.id, p.name, p.photo_file_id, p.stock_qty, p.category_id, c.name AS category_name, p.created_at, p.updated_at
+      SELECT p.id, p.name, p.photo_file_id, p.stock_qty, p.price, p.category_id, c.name AS category_name, p.created_at, p.updated_at
       FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_deleted = FALSE ORDER BY p.id DESC
     `;
     res.setHeader("Cache-Control", "no-store, max-age=0");
