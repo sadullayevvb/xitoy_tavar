@@ -18,12 +18,12 @@ export default async function handler(req, res) {
     const telegramId = String(req.query?.telegram_id || "").trim();
     if (telegramId) {
       if (!/^\d{1,20}$/.test(telegramId)) return res.status(400).json({ ok: false, error: "Telegram ID noto'g'ri" });
-      const customers = await sql`SELECT telegram_id, customer_name AS name, shop, address, phone FROM customer_orders WHERE telegram_id = ${telegramId} ORDER BY created_at DESC, id DESC LIMIT 1`;
+      const customers = await sql`SELECT telegram_id, customer_name AS name, shop, address, phone FROM customer_orders WHERE telegram_id = ${telegramId}::bigint ORDER BY created_at DESC, id DESC LIMIT 1`;
       if (!customers.length) return res.status(404).json({ ok: false, error: "Mijoz topilmadi" });
-      const orders = await sql`SELECT id, total_qty, total_amount, created_at FROM customer_orders WHERE telegram_id = ${telegramId} ORDER BY created_at DESC, id DESC LIMIT 100`;
+      const orders = await sql`SELECT id, total_qty, total_amount, created_at FROM customer_orders WHERE telegram_id = ${telegramId}::bigint ORDER BY created_at DESC, id DESC LIMIT 100`;
       const ids = orders.map(x => Number(x.id));
       let items = [];
-      if (ids.length) items = await sql`SELECT order_id, product_name, quantity, unit_price, line_total FROM customer_order_items WHERE order_id = ANY(${ids}) ORDER BY id`;
+      if (ids.length) items = await sql`SELECT order_id, product_name, quantity, unit_price, line_total FROM customer_order_items WHERE order_id = ANY(${ids}::bigint[]) ORDER BY id`;
       return res.status(200).json({ ok: true, customer: { ...customers[0], orders: orders.map(order => ({ ...order, items: items.filter(item => Number(item.order_id) === Number(order.id)) })) } });
     }
     const customers = await sql`
@@ -41,6 +41,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, customers });
   } catch (error) {
     console.error("ADMIN CUSTOMERS ERROR:", error);
-    return res.status(500).json({ ok: false, error: "Mijozlar tarixini yuklashda xatolik" });
+    return res.status(500).json({ ok: false, error: String(error?.message || "Mijozlar tarixini yuklashda xatolik").slice(0, 240) });
   }
 }
