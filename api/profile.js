@@ -64,7 +64,14 @@ export default async function handler(req, res) {
     `;
     if (body.action === "get") {
       const rows = await sql`SELECT telegram_id, phone, first_name, last_name, username, avatar_data, updated_at FROM user_profiles WHERE telegram_id = ${String(user.id)} LIMIT 1`;
-      return res.status(200).json({ ok: true, profile: rows[0] });
+      await sql`CREATE TABLE IF NOT EXISTS customer_orders (id BIGSERIAL PRIMARY KEY, telegram_id BIGINT NOT NULL, customer_name TEXT NOT NULL, shop TEXT NOT NULL, address TEXT NOT NULL, phone TEXT NOT NULL, total_qty INTEGER NOT NULL DEFAULT 0, total_amount NUMERIC(14,2) NOT NULL DEFAULT 0, telegram_message_id BIGINT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
+      await sql`CREATE TABLE IF NOT EXISTS customer_order_items (id BIGSERIAL PRIMARY KEY, order_id BIGINT NOT NULL REFERENCES customer_orders(id) ON DELETE CASCADE, product_id INTEGER, product_name TEXT NOT NULL, quantity INTEGER NOT NULL, unit_price NUMERIC(12,2) NOT NULL DEFAULT 0, line_total NUMERIC(14,2) NOT NULL DEFAULT 0)`;
+      const orders = await sql`SELECT id, customer_name, shop, total_qty, total_amount, created_at FROM customer_orders WHERE telegram_id = ${String(user.id)} ORDER BY created_at DESC, id DESC LIMIT 100`;
+      const orderIds = orders.map(x => Number(x.id));
+      let items = [];
+      if (orderIds.length) items = await sql`SELECT order_id, product_name, quantity, unit_price, line_total FROM customer_order_items WHERE order_id = ANY(${orderIds}) ORDER BY id`;
+      const history = orders.map(order => ({...order, items: items.filter(item => Number(item.order_id) === Number(order.id))}));
+      return res.status(200).json({ ok: true, profile: rows[0], orders: history });
     }
     if (body.action === "save") {
       const name = String(body.name || "").trim();
