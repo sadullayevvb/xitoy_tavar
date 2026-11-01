@@ -71,7 +71,7 @@ export default async function handler(req, res) {
       let items = [];
       if (orderIds.length) items = await sql`SELECT order_id, product_name, quantity, unit_price, line_total FROM customer_order_items WHERE order_id = ANY(${orderIds}) ORDER BY id`;
       const history = orders.map(order => ({...order, items: items.filter(item => Number(item.order_id) === Number(order.id))}));
-      return res.status(200).json({ ok: true, profile: rows[0], orders: history });
+      return res.status(200).json({ ok: true, profile: { ...rows[0], orders: history } });
     }
     if (body.action === "save") {
       const name = String(body.name || "").trim();
