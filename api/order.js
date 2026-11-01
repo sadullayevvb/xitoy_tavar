@@ -81,6 +81,8 @@ export default async function handler(req, res) {
     client = await pool.connect();
     await client.query("BEGIN");
     inTransaction = true;
+    await client.query("CREATE TABLE IF NOT EXISTS customer_orders (id BIGSERIAL PRIMARY KEY, telegram_id BIGINT NOT NULL, customer_name TEXT NOT NULL, shop TEXT NOT NULL, address TEXT NOT NULL, phone TEXT NOT NULL, total_qty INTEGER NOT NULL DEFAULT 0, total_amount NUMERIC(14,2) NOT NULL DEFAULT 0, telegram_message_id BIGINT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+    await client.query("CREATE TABLE IF NOT EXISTS customer_order_items (id BIGSERIAL PRIMARY KEY, order_id BIGINT NOT NULL REFERENCES customer_orders(id) ON DELETE CASCADE, product_id INTEGER, product_name TEXT NOT NULL, quantity INTEGER NOT NULL, unit_price NUMERIC(12,2) NOT NULL DEFAULT 0, line_total NUMERIC(14,2) NOT NULL DEFAULT 0)");
 
     const { rows: products } = await client.query(
       `SELECT id, name, stock_qty, price, is_deleted FROM products WHERE id = ANY($1::int[]) FOR UPDATE`,
@@ -130,9 +132,16 @@ export default async function handler(req, res) {
     const result = await telegramResponse.json();
     if (!result.ok) throw Object.assign(new Error("Buyurtmani guruhga yuborib bo'lmadi"), { statusCode: 502 });
 
+    const savedOrder = await client.query("INSERT INTO customer_orders (telegram_id, customer_name, shop, address, phone, total_qty, total_amount, telegram_message_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id", [String(user.id), customerInfo.name, customerInfo.shop, customerInfo.address, customerInfo.phone, total, totalPrice, result.result?.message_id || null]);
+    const savedOrderId = savedOrder.rows[0].id;
+    for (const product of products) {
+      const qty = quantities.get(Number(product.id));
+      const unitPrice = Number(product.price || 0);
+      await client.query("INSERT INTO customer_order_items (order_id, product_id, product_name, quantity, unit_price, line_total) VALUES ($1,$2,$3,$4,$5,$6)", [savedOrderId, product.id, product.name, qty, unitPrice, unitPrice * qty]);
+    }
     await client.query("COMMIT");
     inTransaction = false;
-    return res.status(200).json({ ok: true, message: "Buyurtma qabul qilindi" });
+    return res.status(200).json({ ok: true, order_id: savedOrderId, message: "Buyurtma qabul qilindi" });
   } catch (error) {
     if (client && inTransaction) {
       try { await client.query("ROLLBACK"); } catch (_) {}
