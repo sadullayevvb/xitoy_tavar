@@ -118,7 +118,7 @@ export default async function handler(req, res) {
       `🛒 YANGI ZAKAZ #${savedOrderId}`, "",
       `👤 Mijoz: ${customerInfo.name}`, `🏪 Do‘kon: ${customerInfo.shop}`,
       `📍 Manzil: ${customerInfo.address}`, `📱 Telefon: ${customerInfo.phone}`,
-      `🔗 Username: ${user.username ? "@" + user.username : "Yo‘q"}`,
+      `🔗 Manba: ${Number(user.id) ? (user.username ? "@" + user.username : "Telegram Mini App") : "Sayt (Telegram loginisiz)"}`,
       `🆔 Telegram ID: ${user.id}`, "", "📦 Mahsulotlar:", ...lines, "",
       `📊 Jami: ${total} dona`, `💵 Umumiy summa: $${totalPrice.toFixed(2)}`,
       "", "⏳ Holat: tasdiqlash kutilmoqda"
