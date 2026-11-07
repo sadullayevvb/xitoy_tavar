@@ -85,7 +85,7 @@ export default async function handler(req, res) {
     await client.query("BEGIN");
     inTransaction = true;
     await client.query("CREATE TABLE IF NOT EXISTS customer_orders (id BIGSERIAL PRIMARY KEY, telegram_id BIGINT NOT NULL, customer_name TEXT NOT NULL, shop TEXT NOT NULL, address TEXT NOT NULL, phone TEXT NOT NULL, total_qty INTEGER NOT NULL DEFAULT 0, total_amount NUMERIC(14,2) NOT NULL DEFAULT 0, telegram_message_id BIGINT, status TEXT NOT NULL DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
-    await client.query("ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'");
+    await client.query("ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'legacy'");
     await client.query("CREATE TABLE IF NOT EXISTS customer_order_items (id BIGSERIAL PRIMARY KEY, order_id BIGINT NOT NULL REFERENCES customer_orders(id) ON DELETE CASCADE, product_id INTEGER, product_name TEXT NOT NULL, quantity INTEGER NOT NULL, unit_price NUMERIC(12,2) NOT NULL DEFAULT 0, line_total NUMERIC(14,2) NOT NULL DEFAULT 0)");
     const { rows: products } = await client.query(
       `SELECT id, name, stock_qty, price, is_deleted FROM products WHERE id = ANY($1::int[]) FOR UPDATE`,
