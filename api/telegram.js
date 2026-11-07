@@ -15,7 +15,7 @@ function orderText(order, items, statusLine = "⏳ Holat: tasdiqlash kutilmoqda"
   return [`🛒 ZAKAZ #${order.id}`, "", `👤 Mijoz: ${order.customer_name}`, `🏪 Do‘kon: ${order.shop}`,
     `📍 Manzil: ${order.address}`, `📱 Telefon: ${order.phone}`, "", "📦 Mahsulotlar:", ...lines, "",
     `📊 Jami: ${items.reduce((n,x)=>n+Number(x.quantity),0)} dona`,
-    `💵 Umumiy summa: ${items.reduce((n,x)=>n+Number(x.line_total),0).toFixed(2)}`, "", statusLine].join("\\n");
+    `💵 Umumiy summa: ${items.reduce((n,x)=>n+Number(x.line_total),0).toFixed(2)}`, "", statusLine].join("\n");
 }
 async function handleOrderCallback(update) {
   const q = update.callback_query;
