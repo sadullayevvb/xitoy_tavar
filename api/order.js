@@ -26,7 +26,7 @@ export default async function handler(req, res) {
 
   try {
     const { items, initData, customer } = req.body || {};
-    if (!BOT_TOKEN || !initData) return fail(res, 401, "Telegram orqali kiring");
+    if (!BOT_TOKEN) return fail(res, 500, "Bot sozlanmagan");
     const customerInfo = {
       name: String(customer?.name || "").trim().slice(0, 120),
       shop: String(customer?.shop || "").trim().slice(0, 120),
@@ -35,34 +35,30 @@ export default async function handler(req, res) {
     };
     if (!customerInfo.name || !customerInfo.shop || !customerInfo.address || !customerInfo.phone) return fail(res, 400, "Ism, do‘kon nomi, manzil va telefonni to‘ldiring");
 
-    const { createHmac, timingSafeEqual } = await import("node:crypto");
-    const params = new URLSearchParams(initData);
-    const receivedHash = params.get("hash");
-    if (!receivedHash || !/^[a-f0-9]{64}$/i.test(receivedHash)) return fail(res, 401, "Telegram ma'lumoti noto'g'ri");
-    params.delete("hash");
-    const dataCheckString = [...params.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([key,value]) => `${key}=${value}`).join("\n");
-    const secret = createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
-    const calculatedHash = createHmac("sha256", secret).update(dataCheckString).digest();
-    const receivedHashBuffer = Buffer.from(receivedHash, "hex");
-    if (receivedHashBuffer.length !== calculatedHash.length || !timingSafeEqual(calculatedHash, receivedHashBuffer)) return fail(res, 401, "Telegram tekshiruvidan o'tmadi");
-
-    const authDate = Number(params.get("auth_date"));
-    if (!Number.isFinite(authDate) || Math.abs(Date.now() / 1000 - authDate) > 86400) return fail(res, 401, "Mini Appni qayta oching");
-
-    const user = JSON.parse(params.get("user") || "{}");
-    if (!user.id) return fail(res, 401, "Telegram foydalanuvchisi topilmadi");
-    await sql`CREATE TABLE IF NOT EXISTS user_profiles (
-      telegram_id BIGINT PRIMARY KEY,
-      phone TEXT NOT NULL DEFAULT '',
-      first_name TEXT NOT NULL DEFAULT '',
-      last_name TEXT NOT NULL DEFAULT '',
-      username TEXT NOT NULL DEFAULT '',
-      avatar_data TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`;
-    const profileRows = await sql`SELECT phone, first_name, last_name FROM user_profiles WHERE telegram_id = ${String(user.id)} LIMIT 1`;
-    const profile = profileRows[0] || {};
+    let user = { id: 0, username: "Sayt orqali" };
+    if (initData) {
+      const { createHmac, timingSafeEqual } = await import("node:crypto");
+      const params = new URLSearchParams(initData);
+      const receivedHash = params.get("hash");
+      if (!receivedHash || !/^[a-f0-9]{64}$/i.test(receivedHash)) return fail(res, 401, "Telegram ma'lumoti noto'g'ri");
+      params.delete("hash");
+      const dataCheckString = [...params.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([key,value]) => `${key}=${value}`).join("\\n");
+      const secret = createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
+      const calculatedHash = createHmac("sha256", secret).update(dataCheckString).digest();
+      const receivedHashBuffer = Buffer.from(receivedHash, "hex");
+      if (receivedHashBuffer.length !== calculatedHash.length || !timingSafeEqual(calculatedHash, receivedHashBuffer)) return fail(res, 401, "Telegram tekshiruvidan o'tmadi");
+      const authDate = Number(params.get("auth_date"));
+      if (!Number.isFinite(authDate) || Math.abs(Date.now() / 1000 - authDate) > 86400) return fail(res, 401, "Mini Appni qayta oching");
+      user = JSON.parse(params.get("user") || "{}");
+      if (!user.id) return fail(res, 401, "Telegram foydalanuvchisi topilmadi");
+      await sql`CREATE TABLE IF NOT EXISTS user_profiles (
+        telegram_id BIGINT PRIMARY KEY, phone TEXT NOT NULL DEFAULT '', first_name TEXT NOT NULL DEFAULT '',
+        last_name TEXT NOT NULL DEFAULT '', username TEXT NOT NULL DEFAULT '', avatar_data TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`;
+      const profileRows = await sql`SELECT phone, first_name, last_name FROM user_profiles WHERE telegram_id = ${String(user.id)} LIMIT 1`;
+      const profile = profileRows[0] || {};
+    }
 
     if (!Array.isArray(items) || items.length === 0 || items.length > 100) return fail(res, 400, "Savat bo'sh");
     const quantities = new Map();
