@@ -53,7 +53,7 @@ export default async function handler(req, res) {
         const verifiedUser = JSON.parse(params.get("user") || "{}");
         if (!verifiedUser.id) throw new Error("missing Telegram user");
         user = verifiedUser;
-        await sql\`CREATE TABLE IF NOT EXISTS user_profiles (telegram_id BIGINT PRIMARY KEY, phone TEXT NOT NULL DEFAULT '', first_name TEXT NOT NULL DEFAULT '', last_name TEXT NOT NULL DEFAULT '', username TEXT NOT NULL DEFAULT '', avatar_data TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)\`;
+        await sql`CREATE TABLE IF NOT EXISTS user_profiles (telegram_id BIGINT PRIMARY KEY, phone TEXT NOT NULL DEFAULT '', first_name TEXT NOT NULL DEFAULT '', last_name TEXT NOT NULL DEFAULT '', username TEXT NOT NULL DEFAULT '', avatar_data TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`;
       } catch (authError) {
         user = { id: 0, username: "Sayt orqali" };
       }
